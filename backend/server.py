@@ -160,8 +160,9 @@ async def compress_pdf(file: UploadFile = File(...)):
         pdf_writer = PdfWriter()
         
         for page in pdf_reader.pages:
-            page.compress_content_streams()
             pdf_writer.add_page(page)
+            # Compress after adding to writer
+            pdf_writer.pages[-1].compress_content_streams()
         
         # Save compressed PDF
         output_file = UPLOAD_DIR / f"{uuid.uuid4()}_compressed.pdf"
