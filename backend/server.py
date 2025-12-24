@@ -20,9 +20,16 @@ import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
+from reportlab.lib.units import inch
 import openpyxl
 from docx import Document
 import pytesseract
+from pygments import highlight
+from pygments.lexers import JavaLexer
+from pygments.formatters import HtmlFormatter
+import html
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -672,6 +679,87 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
     
     except Exception as e:
         cleanup_files(temp_file, signature_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/java-to-pdf")
+async def java_to_pdf(file: UploadFile = File(...)):
+    """Convert Java source code file to PDF with syntax highlighting"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.java'):
+            raise HTTPException(status_code=400, detail="File must be a .java file")
+        
+        temp_file = await save_upload_file(file)
+        
+        # Read Java source code
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            java_code = f.read()
+        
+        # Create PDF with syntax highlighted code
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_java.pdf"
+        
+        # Create PDF using ReportLab
+        c = canvas.Canvas(str(output_file), pagesize=letter)
+        width, height = letter
+        
+        # Set up fonts and layout
+        margin = 50
+        y_position = height - margin
+        line_height = 12
+        font_size = 9
+        
+        # Add header with filename
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(margin, y_position, f"Java Source: {file.filename}")
+        y_position -= 30
+        
+        # Draw a line separator
+        c.line(margin, y_position, width - margin, y_position)
+        y_position -= 20
+        
+        # Set font for code
+        c.setFont("Courier", font_size)
+        
+        # Split code into lines and write to PDF
+        lines = java_code.split('\n')
+        
+        for i, line in enumerate(lines, 1):
+            # Check if we need a new page
+            if y_position < margin + 20:
+                c.showPage()
+                y_position = height - margin
+                c.setFont("Courier", font_size)
+            
+            # Add line number and code
+            line_num = f"{i:4d} | "
+            c.setFillColorRGB(0.5, 0.5, 0.5)
+            c.drawString(margin, y_position, line_num)
+            
+            # Draw code line (truncate if too long)
+            c.setFillColorRGB(0, 0, 0)
+            max_chars = 95
+            display_line = line[:max_chars] if len(line) > max_chars else line
+            c.drawString(margin + 50, y_position, display_line)
+            
+            y_position -= line_height
+        
+        c.save()
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read Java file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 # Include the router in the main app
