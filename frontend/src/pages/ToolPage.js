@@ -137,12 +137,6 @@ const toolConfigs = {
     inputLabel: "Signature Text",
     inputPlaceholder: "Your Name",
   },
-  "java-to-pdf": {
-    title: "Java to PDF",
-    acceptFiles: ".java",
-    multiple: false,
-    hasExtraInput: false,
-  },
 };
 
 export default function ToolPage() {

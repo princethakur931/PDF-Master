@@ -24,7 +24,6 @@ import {
   Menu,
   X,
   ChevronRight,
-  FileCode,
 } from "lucide-react";
 
 const tools = [
@@ -147,13 +146,6 @@ const tools = [
     description: "Add signature to PDF",
     color: "from-fuchsia-500 to-pink-500",
   },
-  {
-    id: "java-to-pdf",
-    name: "Java to PDF",
-    icon: FileCode,
-    description: "Convert Java code files to PDF",
-    color: "from-orange-600 to-red-600",
-  },
 ];
 
 export default function Home() {
@@ -194,7 +186,6 @@ export default function Home() {
       { id: "png-to-pdf", name: "PNG to PDF", icon: FileImage },
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
-      { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
