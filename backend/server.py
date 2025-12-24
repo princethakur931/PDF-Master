@@ -698,7 +698,7 @@ async def java_to_pdf(file: UploadFile = File(...)):
         with open(temp_file, 'r', encoding='utf-8') as f:
             java_code = f.read()
         
-        # Create PDF with syntax highlighted code
+        # Create PDF with formatted code and line numbers
         output_file = UPLOAD_DIR / f"{uuid.uuid4()}_java.pdf"
         
         # Create PDF using ReportLab
