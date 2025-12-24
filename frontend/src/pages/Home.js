@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   FileText,
   Combine,
@@ -147,7 +147,15 @@ const tools = [
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem("theme");
+    return savedTheme === "light" ? false : true;
+  });
+
+  // Save theme preference to localStorage
+  useEffect(() => {
+    localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
 
   // Filter tools based on search query
   const filteredTools = useMemo(() => {
@@ -287,16 +295,6 @@ export default function Home() {
                 )}
               </div>
             </div>
-            {searchQuery && (
-              <p
-                className={`text-sm mt-3 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-600"
-                }`}
-              >
-                Found {filteredTools.length} tool
-                {filteredTools.length !== 1 ? "s" : ""}
-              </p>
-            )}
           </motion.div>
         </div>
       </motion.section>

@@ -27,10 +27,18 @@ import pytesseract
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection (optional - for future use)
+try:
+    mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+    db = client[os.environ.get('DB_NAME', 'test_database')]
+    # Test connection
+    client.admin.command('ping')
+    logging.info("MongoDB connected successfully")
+except Exception as e:
+    logging.warning(f"MongoDB connection failed: {e}. Running without database.")
+    client = None
+    db = None
 
 # Create temporary upload directory
 UPLOAD_DIR = ROOT_DIR / 'temp_uploads'
@@ -686,4 +694,5 @@ logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    if client:
+        client.close()
