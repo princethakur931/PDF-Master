@@ -769,15 +769,6 @@ async def java_to_pdf(file: UploadFile = File(...)):
         line_height = 12
         font_size = 9
         
-        # Add header with filename
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(margin, y_position, f"Java Source: {file.filename}")
-        y_position -= 30
-        
-        # Draw a line separator
-        c.line(margin, y_position, width - margin, y_position)
-        y_position -= 20
-        
         # Set font for code
         c.setFont("Courier", font_size)
         
@@ -791,19 +782,14 @@ async def java_to_pdf(file: UploadFile = File(...)):
                 y_position = height - margin
                 c.setFont("Courier", font_size)
             
-            # Add line number and code
-            line_num = f"{i:4d} | "
-            c.setFillColorRGB(0.5, 0.5, 0.5)
-            c.drawString(margin, y_position, line_num)
-            
             # Draw code line (truncate if too long with ellipsis indicator)
             c.setFillColorRGB(0, 0, 0)
-            max_chars = 92
+            max_chars = 100
             if len(line) > max_chars:
                 display_line = line[:max_chars] + "..."
             else:
                 display_line = line
-            c.drawString(margin + 50, y_position, display_line)
+            c.drawString(margin, y_position, display_line)
             
             y_position -= line_height
         
