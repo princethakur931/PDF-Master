@@ -1,9 +1,0 @@
-.env
-.venv
-temp_uploads/
-__pycache__/
-*.pyc
-node_modules/
-frontend/build/
-frontend/.env.local
-.DS_Store
