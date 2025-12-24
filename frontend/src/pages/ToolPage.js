@@ -97,6 +97,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "cpp-to-pdf": {
+    title: "CPP to PDF",
+    acceptFiles: ".cpp,.cc,.cxx,.h,.hpp",
+    multiple: false,
+    hasExtraInput: false,
+  },
   ocr: {
     title: "OCR PDF",
     acceptFiles: ".pdf",
