@@ -23,6 +23,13 @@ from reportlab.lib.utils import ImageReader
 import openpyxl
 from docx import Document
 import pytesseract
+from pygments import highlight
+from pygments.lexers import CppLexer
+from pygments.formatters import HtmlFormatter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.units import inch
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -479,6 +486,64 @@ async def pdf_to_excel(file: UploadFile = File(...)):
             output_file,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename="converted.xlsx",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/cpp-to-pdf")
+async def cpp_to_pdf(file: UploadFile = File(...)):
+    """Convert CPP source code to PDF with syntax highlighting"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        
+        # Read the C++ source code
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            cpp_code = f.read()
+        
+        # Create PDF with syntax highlighting
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a custom style for code
+        code_style = ParagraphStyle(
+            'Code',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        
+        story = []
+        
+        # Split code into lines and add to PDF
+        lines = cpp_code.split('\n')
+        for line in lines:
+            # Escape special characters for reportlab
+            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Preserve spaces
+            line = line.replace(' ', '&nbsp;')
+            if not line.strip():
+                line = '&nbsp;'
+            story.append(Paragraph(line, code_style))
+        
+        doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="converted.pdf",
             background=lambda: cleanup_files(temp_file, output_file)
         )
     

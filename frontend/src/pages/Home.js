@@ -112,6 +112,13 @@ const tools = [
     color: "from-emerald-500 to-green-500",
   },
   {
+    id: "cpp-to-pdf",
+    name: "CPP to PDF",
+    icon: FileText,
+    description: "Convert C++ code to PDF",
+    color: "from-slate-500 to-gray-600",
+  },
+  {
     id: "ocr",
     name: "OCR PDF",
     icon: FileSearch,
@@ -186,6 +193,7 @@ export default function Home() {
       { id: "png-to-pdf", name: "PNG to PDF", icon: FileImage },
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
+      { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
