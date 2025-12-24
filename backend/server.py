@@ -23,10 +23,6 @@ from reportlab.lib.utils import ImageReader
 import openpyxl
 from docx import Document
 import pytesseract
-from pygments import highlight
-from pygments.lexers import JavaLexer
-from pygments.formatters import HtmlFormatter
-import html
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -680,7 +676,7 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
 
 @api_router.post("/java-to-pdf")
 async def java_to_pdf(file: UploadFile = File(...)):
-    """Convert Java source code file to PDF with syntax highlighting"""
+    """Convert Java source code file to PDF with formatted text and line numbers"""
     temp_file = None
     output_file = None
     
