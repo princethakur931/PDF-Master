@@ -230,15 +230,14 @@ export default function ToolPage() {
       } else {
         const blob = new Blob([response.data]);
         const url = window.URL.createObjectURL(blob);
-        const extension = toolId.includes("jpg")
-          ? "jpg"
-          : toolId.includes("png")
-          ? "png"
-          : toolId.includes("word")
-          ? "docx"
-          : toolId.includes("excel")
-          ? "xlsx"
-          : "pdf";
+
+        // Determine output file extension based on conversion direction
+        let extension = "pdf";
+        if (toolId === "pdf-to-jpg") extension = "jpg";
+        else if (toolId === "pdf-to-png") extension = "png";
+        else if (toolId === "pdf-to-word") extension = "docx";
+        else if (toolId === "pdf-to-excel") extension = "xlsx";
+
         setResult({ type: "file", url, filename: `output.${extension}` });
         toast.success("Processing complete!");
       }

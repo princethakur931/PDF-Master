@@ -21,6 +21,9 @@ import {
   Linkedin,
   Github,
   Mail,
+  Menu,
+  X,
+  ChevronRight,
 } from "lucide-react";
 
 const tools = [
@@ -151,11 +154,55 @@ export default function Home() {
     const savedTheme = localStorage.getItem("theme");
     return savedTheme === "light" ? false : true;
   });
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Save theme preference to localStorage
   useEffect(() => {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
+
+  // Disable body scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [isMenuOpen]);
+
+  // Categorized tools for menu
+  const menuCategories = {
+    basic: [
+      { id: "merge", name: "Merge PDF", icon: Combine },
+      { id: "split", name: "Split PDF", icon: Scissors },
+      { id: "compress", name: "Compress PDF", icon: Minimize2 },
+      { id: "rotate", name: "Rotate PDF", icon: RotateCw },
+    ],
+    convertToPdf: [
+      { id: "jpg-to-pdf", name: "JPG to PDF", icon: ImageIcon },
+      { id: "png-to-pdf", name: "PNG to PDF", icon: FileImage },
+      { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
+      { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
+    ],
+    convertFromPdf: [
+      { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
+      { id: "pdf-to-png", name: "PDF to PNG", icon: FileImage },
+      { id: "pdf-to-word", name: "PDF to Word", icon: FileText },
+      { id: "pdf-to-excel", name: "PDF to Excel", icon: FileSpreadsheet },
+    ],
+    security: [
+      { id: "protect", name: "Protect PDF", icon: Lock },
+      { id: "unlock", name: "Unlock PDF", icon: Unlock },
+      { id: "sign", name: "Sign PDF", icon: PenTool },
+    ],
+    other: [
+      { id: "watermark", name: "Add Watermark", icon: Droplet },
+      { id: "ocr", name: "OCR PDF", icon: FileSearch },
+    ],
+  };
 
   // Filter tools based on search query
   const filteredTools = useMemo(() => {
@@ -174,6 +221,32 @@ export default function Home() {
         isDarkMode ? "bg-gray-950" : "bg-gray-50"
       }`}
     >
+      {/* Menu Button */}
+      <motion.button
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.5 }}
+        onClick={() => setIsMenuOpen(!isMenuOpen)}
+        className={`fixed top-6 right-20 z-50 p-3 rounded-full ${
+          isDarkMode
+            ? "bg-white/10 hover:bg-white/20"
+            : "bg-gray-800/10 hover:bg-gray-800/20"
+        } backdrop-blur-lg border ${
+          isDarkMode ? "border-white/20" : "border-gray-800/20"
+        } transition-all duration-300 hover:scale-110`}
+        aria-label="Toggle menu"
+      >
+        {isMenuOpen ? (
+          <X
+            className={`w-6 h-6 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+          />
+        ) : (
+          <Menu
+            className={`w-6 h-6 ${isDarkMode ? "text-white" : "text-gray-800"}`}
+          />
+        )}
+      </motion.button>
+
       {/* Dark/Light Mode Toggle */}
       <motion.button
         initial={{ opacity: 0, x: 50 }}
@@ -195,6 +268,192 @@ export default function Home() {
           <Moon className="w-6 h-6 text-gray-800" />
         )}
       </motion.button>
+
+      {/* Slide-out Menu */}
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: isMenuOpen ? 0 : "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className={`fixed top-0 right-0 h-full w-80 z-40 ${
+          isDarkMode ? "bg-gray-900" : "bg-white"
+        } shadow-2xl overflow-y-auto`}
+      >
+        <div className="p-6 pt-24">
+          <h2
+            className={`text-2xl font-heading font-bold mb-6 ${
+              isDarkMode ? "text-white" : "text-gray-900"
+            }`}
+          >
+            Quick Access
+          </h2>
+
+          {/* Basic Tools */}
+          <div className="mb-6">
+            <h3
+              className={`text-sm font-semibold mb-3 uppercase tracking-wide ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Basic Tools
+            </h3>
+            <div className="space-y-2">
+              {menuCategories.basic.map(tool => (
+                <Link
+                  key={tool.id}
+                  to={`/tool/${tool.id}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isDarkMode
+                      ? "hover:bg-white/10 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <tool.icon className="w-5 h-5" />
+                    <span>{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Convert to PDF */}
+          <div className="mb-6">
+            <h3
+              className={`text-sm font-semibold mb-3 uppercase tracking-wide ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Convert to PDF
+            </h3>
+            <div className="space-y-2">
+              {menuCategories.convertToPdf.map(tool => (
+                <Link
+                  key={tool.id}
+                  to={`/tool/${tool.id}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isDarkMode
+                      ? "hover:bg-white/10 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <tool.icon className="w-5 h-5" />
+                    <span>{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Convert from PDF */}
+          <div className="mb-6">
+            <h3
+              className={`text-sm font-semibold mb-3 uppercase tracking-wide ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Convert from PDF
+            </h3>
+            <div className="space-y-2">
+              {menuCategories.convertFromPdf.map(tool => (
+                <Link
+                  key={tool.id}
+                  to={`/tool/${tool.id}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isDarkMode
+                      ? "hover:bg-white/10 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <tool.icon className="w-5 h-5" />
+                    <span>{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Security */}
+          <div className="mb-6">
+            <h3
+              className={`text-sm font-semibold mb-3 uppercase tracking-wide ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Security
+            </h3>
+            <div className="space-y-2">
+              {menuCategories.security.map(tool => (
+                <Link
+                  key={tool.id}
+                  to={`/tool/${tool.id}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isDarkMode
+                      ? "hover:bg-white/10 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <tool.icon className="w-5 h-5" />
+                    <span>{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Other Tools */}
+          <div className="mb-6">
+            <h3
+              className={`text-sm font-semibold mb-3 uppercase tracking-wide ${
+                isDarkMode ? "text-gray-400" : "text-gray-600"
+              }`}
+            >
+              Other Tools
+            </h3>
+            <div className="space-y-2">
+              {menuCategories.other.map(tool => (
+                <Link
+                  key={tool.id}
+                  to={`/tool/${tool.id}`}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between p-3 rounded-lg transition-all ${
+                    isDarkMode
+                      ? "hover:bg-white/10 text-gray-300 hover:text-white"
+                      : "hover:bg-gray-100 text-gray-700 hover:text-gray-900"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <tool.icon className="w-5 h-5" />
+                    <span>{tool.name}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Overlay */}
+      {isMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={() => setIsMenuOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30"
+        />
+      )}
 
       {/* Background Effects */}
       <div className="fixed inset-0 -z-10">
