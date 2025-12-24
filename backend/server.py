@@ -20,9 +20,6 @@ import io
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
-from reportlab.lib.units import inch
 import openpyxl
 from docx import Document
 import pytesseract
