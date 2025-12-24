@@ -738,10 +738,13 @@ async def java_to_pdf(file: UploadFile = File(...)):
             c.setFillColorRGB(0.5, 0.5, 0.5)
             c.drawString(margin, y_position, line_num)
             
-            # Draw code line (truncate if too long)
+            # Draw code line (truncate if too long with ellipsis indicator)
             c.setFillColorRGB(0, 0, 0)
-            max_chars = 95
-            display_line = line[:max_chars] if len(line) > max_chars else line
+            max_chars = 92
+            if len(line) > max_chars:
+                display_line = line[:max_chars] + "..."
+            else:
+                display_line = line
             c.drawString(margin + 50, y_position, display_line)
             
             y_position -= line_height
