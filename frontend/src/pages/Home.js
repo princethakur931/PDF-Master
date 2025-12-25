@@ -201,6 +201,7 @@ export default function Home() {
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
+      { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
