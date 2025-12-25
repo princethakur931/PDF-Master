@@ -103,6 +103,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "ipynb-to-pdf": {
+    title: "Jupyter Notebook to PDF",
+    acceptFiles: ".ipynb",
+    multiple: false,
+    hasExtraInput: false,
+  },
   ocr: {
     title: "OCR PDF",
     acceptFiles: ".pdf",
@@ -616,8 +622,7 @@ export default function ToolPage() {
                       </Button>
                       <Button
                         onClick={handleReset}
-                        variant="outline"
-                        className="w-full"
+                        className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
                         data-testid="process-another-button"
                       >
                         Process Another File
@@ -656,8 +661,7 @@ export default function ToolPage() {
                     </p>
                     <Button
                       onClick={handleReset}
-                      variant="outline"
-                      className="w-full"
+                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
                     >
                       Process Another File
                     </Button>
