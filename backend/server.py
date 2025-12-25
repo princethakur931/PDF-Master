@@ -24,7 +24,7 @@ import openpyxl
 from docx import Document
 import pytesseract
 from pygments import highlight
-from pygments.lexers import CppLexer
+from pygments.lexers import CppLexer, PythonLexer
 from pygments.formatters import HtmlFormatter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -1050,6 +1050,76 @@ async def java_to_pdf(file: UploadFile = File(...)):
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=400, detail="Unable to read Java file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/python-to-pdf")
+async def python_to_pdf(file: UploadFile = File(...)):
+    """Convert Python source code file to PDF with formatted text and line numbers"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.py'):
+            raise HTTPException(status_code=400, detail="File must be a .py file")
+        
+        temp_file = await save_upload_file(file)
+        
+        # Read Python source code
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            python_code = f.read()
+        
+        # Create PDF with formatted code
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_python.pdf"
+        
+        # Create PDF using ReportLab
+        c = canvas.Canvas(str(output_file), pagesize=letter)
+        width, height = letter
+        
+        # Set up fonts and layout
+        margin = 50
+        y_position = height - margin
+        line_height = 12
+        font_size = 9
+        
+        # Set font for code
+        c.setFont("Courier", font_size)
+        
+        # Split code into lines and write to PDF
+        lines = python_code.split('\n')
+        
+        for line in lines:
+            # Check if we need a new page
+            if y_position < margin + 20:
+                c.showPage()
+                y_position = height - margin
+                c.setFont("Courier", font_size)
+            
+            # Draw code line (truncate if too long)
+            c.setFillColorRGB(0, 0, 0)
+            max_chars = 100
+            if len(line) > max_chars:
+                display_line = line[:max_chars] + "..."
+            else:
+                display_line = line
+            c.drawString(margin, y_position, display_line)
+            
+            y_position -= line_height
+        
+        c.save()
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read Python file. Please ensure it's a valid text file with UTF-8 encoding.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))

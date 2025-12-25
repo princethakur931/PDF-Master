@@ -155,6 +155,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "python-to-pdf": {
+    title: "Python to PDF",
+    acceptFiles: ".py",
+    multiple: false,
+    hasExtraInput: false,
+  },
 };
 
 export default function ToolPage() {
