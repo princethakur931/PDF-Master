@@ -30,6 +30,10 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatte
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.units import inch
+import nbformat
+from nbconvert import PDFExporter
+from nbconvert.preprocessors import ExecutePreprocessor
+import subprocess
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -738,6 +742,247 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
     except Exception as e:
         cleanup_files(temp_file, signature_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/ipynb-to-pdf")
+async def ipynb_to_pdf(file: UploadFile = File(...)):
+    """Convert Jupyter Notebook (.ipynb) to PDF"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.ipynb'):
+            raise HTTPException(status_code=400, detail="File must be a .ipynb file")
+        
+        temp_file = await save_upload_file(file)
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_notebook.pdf"
+        
+        # Read and validate the notebook
+        try:
+            with open(temp_file, 'r', encoding='utf-8') as f:
+                notebook = nbformat.read(f, as_version=4)
+        except nbformat.reader.NotJSONError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid Jupyter Notebook file. The file is not a valid JSON format. Please upload a valid .ipynb file.")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Could not read notebook file: {str(e)}")
+        
+        # Use ReportLab to create PDF directly from notebook content
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted, PageBreak, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.pagesizes import letter, A4
+        from reportlab.lib.units import inch
+        from reportlab.lib.enums import TA_LEFT
+        from reportlab.lib import colors
+        
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter,
+                                leftMargin=0.75*inch, rightMargin=0.75*inch,
+                                topMargin=0.5*inch, bottomMargin=0.5*inch)
+        story = []
+        styles = getSampleStyleSheet()
+        
+        # Custom styles for input cells
+        input_style = ParagraphStyle(
+            'Input',
+            parent=styles['Normal'],
+            fontSize=8,
+            leading=10,
+            textColor=colors.HexColor('#0066cc'),
+            fontName='Courier',
+        )
+        
+        # Custom style for code content
+        code_style = ParagraphStyle(
+            'Code',
+            parent=styles['Code'],
+            fontSize=10,
+            leading=14,
+            fontName='Courier',
+            leftIndent=10,
+            rightIndent=10,
+            spaceBefore=2,
+            spaceAfter=2,
+            wordWrap='CJK',
+        )
+        
+        # Custom style for output
+        output_style = ParagraphStyle(
+            'Output',
+            parent=styles['Code'],
+            fontSize=10,
+            leading=14,
+            fontName='Courier',
+            leftIndent=10,
+            rightIndent=10,
+            spaceBefore=2,
+            spaceAfter=2,
+            wordWrap='CJK',
+        )
+        
+        # Process each cell
+        cell_num = 0
+        for cell in notebook.cells:
+            cell_num += 1
+            
+            if cell.cell_type == 'markdown':
+                # Markdown cell styling
+                markdown_data = [[Paragraph(cell.source.replace('\n', '<br/>'), styles['Normal'])]]
+                markdown_table = Table(markdown_data, colWidths=[6.5*inch])
+                markdown_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.white),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                    ('TOPPADDING', (0, 0), (-1, -1), 10),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e0e0e0')),
+                ]))
+                story.append(markdown_table)
+                story.append(Spacer(1, 0.1*inch))
+                
+            elif cell.cell_type == 'code':
+                # Input cell with label
+                input_label = f"In [{cell_num}]:"
+                code_text = cell.source
+                
+                # Truncate long lines instead of wrapping
+                max_line_length = 75
+                code_lines = code_text.split('\n')
+                truncated_lines = []
+                for line in code_lines:
+                    if len(line) > max_line_length:
+                        # Truncate and add ellipsis
+                        truncated_lines.append(line[:max_line_length] + '...')
+                    else:
+                        truncated_lines.append(line)
+                code_text = '\n'.join(truncated_lines)
+                
+                # Use smaller font for code to fit better
+                small_code_style = ParagraphStyle(
+                    'SmallCode',
+                    parent=styles['Code'],
+                    fontSize=8,
+                    leading=11,
+                    fontName='Courier',
+                    leftIndent=5,
+                    rightIndent=5,
+                    spaceBefore=2,
+                    spaceAfter=2,
+                    wordWrap='CJK',
+                )
+                
+                input_data = [[Paragraph(input_label, input_style), Preformatted(code_text, small_code_style)]]
+                input_table = Table(input_data, colWidths=[0.7*inch, 5.8*inch])
+                input_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f7f7f7')),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                    ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+                    ('ALIGN', (1, 0), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                    ('TOPPADDING', (0, 0), (-1, -1), 8),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e0e0e0')),
+                ]))
+                story.append(input_table)
+                
+                # Add outputs if any
+                if 'outputs' in cell and cell.outputs:
+                    for output in cell.outputs:
+                        output_text = ""
+                        output_bg_color = colors.white
+                        output_text_color = colors.black
+                        
+                        if output.output_type == 'stream':
+                            output_text = output.text
+                        elif output.output_type == 'execute_result' or output.output_type == 'display_data':
+                            if 'text/plain' in output.data:
+                                output_text = output.data['text/plain']
+                        elif output.output_type == 'error':
+                            # Handle error output with red background
+                            output_bg_color = colors.HexColor('#fff0f0')
+                            output_text_color = colors.HexColor('#d32f2f')
+                            # Combine error name, value, and traceback
+                            error_parts = []
+                            if hasattr(output, 'ename'):
+                                error_parts.append(output.ename)
+                            if hasattr(output, 'evalue'):
+                                error_parts.append(output.evalue)
+                            if hasattr(output, 'traceback'):
+                                # Remove ANSI color codes from traceback
+                                import re
+                                clean_traceback = []
+                                for line in output.traceback:
+                                    # Remove ANSI escape sequences
+                                    clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+                                    clean_traceback.append(clean_line)
+                                error_parts.extend(clean_traceback)
+                            output_text = '\n'.join(error_parts)
+                        
+                        if output_text:
+                            # Truncate long lines in output - don't wrap
+                            max_line_length = 75
+                            output_lines = output_text.split('\n')
+                            truncated_output = []
+                            for line in output_lines:
+                                if len(line) > max_line_length:
+                                    # Truncate and add ellipsis
+                                    truncated_output.append(line[:max_line_length] + '...')
+                                else:
+                                    truncated_output.append(line)
+                            output_text = '\n'.join(truncated_output)
+                            
+                            # Create custom style for this output - smaller font
+                            custom_output_style = ParagraphStyle(
+                                'CustomOutput',
+                                parent=styles['Code'],
+                                fontSize=8,
+                                leading=11,
+                                fontName='Courier',
+                                leftIndent=5,
+                                rightIndent=5,
+                                spaceBefore=2,
+                                spaceAfter=2,
+                                textColor=output_text_color,
+                                wordWrap='CJK',
+                            )
+                            
+                            output_data = [[Paragraph("", custom_output_style), Preformatted(output_text, custom_output_style)]]
+                            output_table = Table(output_data, colWidths=[0.7*inch, 5.8*inch])
+                            output_table.setStyle(TableStyle([
+                                ('BACKGROUND', (0, 0), (-1, -1), output_bg_color),
+                                ('TEXTCOLOR', (0, 0), (-1, -1), output_text_color),
+                                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                                ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#e0e0e0')),
+                            ]))
+                            story.append(output_table)
+                
+                story.append(Spacer(1, 0.15*inch))
+        
+        # Build PDF
+        doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="notebook.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except HTTPException:
+        cleanup_files(temp_file, output_file)
+        raise
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"Error converting notebook to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to convert notebook to PDF: {str(e)}")
 
 # Include the router in the main app
 app.include_router(api_router)

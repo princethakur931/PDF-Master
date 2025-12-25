@@ -119,6 +119,13 @@ const tools = [
     color: "from-slate-500 to-gray-600",
   },
   {
+    id: "ipynb-to-pdf",
+    name: "Notebook to PDF",
+    icon: FileText,
+    description: "Convert Jupyter Notebook to PDF",
+    color: "from-orange-600 to-red-600",
+  },
+  {
     id: "ocr",
     name: "OCR PDF",
     icon: FileSearch,
