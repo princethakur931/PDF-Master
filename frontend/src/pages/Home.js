@@ -216,6 +216,7 @@ export default function Home() {
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
+      { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
