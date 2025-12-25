@@ -1033,16 +1033,6 @@ async def java_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         logging.error(f"Error converting notebook to PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to convert notebook to PDF: {str(e)}")
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
-    except UnicodeDecodeError:
-        cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read Java file. Please ensure it's a valid text file with UTF-8 encoding.")
-    except Exception as e:
-        cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Include the router in the main app
 app.include_router(api_router)
