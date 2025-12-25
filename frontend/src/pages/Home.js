@@ -210,6 +210,7 @@ export default function Home() {
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
+      { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
