@@ -746,9 +746,6 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
 @api_router.post("/ipynb-to-pdf")
 async def ipynb_to_pdf(file: UploadFile = File(...)):
     """Convert Jupyter Notebook (.ipynb) to PDF"""
-@api_router.post("/java-to-pdf")
-async def java_to_pdf(file: UploadFile = File(...)):
-    """Convert Java source code file to PDF with formatted text and line numbers"""
     temp_file = None
     output_file = None
     
@@ -971,6 +968,30 @@ async def java_to_pdf(file: UploadFile = File(...)):
         
         # Build PDF
         doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="notebook.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except HTTPException:
+        cleanup_files(temp_file, output_file)
+        raise
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"Error converting notebook to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to convert notebook to PDF: {str(e)}")
+
+@api_router.post("/java-to-pdf")
+async def java_to_pdf(file: UploadFile = File(...)):
+    """Convert Java source code file to PDF with formatted text and line numbers"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
         if not file.filename.lower().endswith('.java'):
             raise HTTPException(status_code=400, detail="File must be a .java file")
         
@@ -980,7 +1001,7 @@ async def java_to_pdf(file: UploadFile = File(...)):
         with open(temp_file, 'r', encoding='utf-8') as f:
             java_code = f.read()
         
-        # Create PDF with formatted code and line numbers
+        # Create PDF with formatted code
         output_file = UPLOAD_DIR / f"{uuid.uuid4()}_java.pdf"
         
         # Create PDF using ReportLab
@@ -1006,7 +1027,7 @@ async def java_to_pdf(file: UploadFile = File(...)):
                 y_position = height - margin
                 c.setFont("Courier", font_size)
             
-            # Draw code line (truncate if too long with ellipsis indicator)
+            # Draw code line (truncate if too long)
             c.setFillColorRGB(0, 0, 0)
             max_chars = 100
             if len(line) > max_chars:
@@ -1022,17 +1043,6 @@ async def java_to_pdf(file: UploadFile = File(...)):
         return FileResponse(
             output_file,
             media_type="application/pdf",
-            filename="notebook.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
-    except HTTPException:
-        cleanup_files(temp_file, output_file)
-        raise
-    except Exception as e:
-        cleanup_files(temp_file, output_file)
-        logging.error(f"Error converting notebook to PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to convert notebook to PDF: {str(e)}")
             filename=f"{Path(file.filename).stem}.pdf",
             background=lambda: cleanup_files(temp_file, output_file)
         )
