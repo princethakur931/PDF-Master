@@ -168,6 +168,13 @@ const tools = [
     description: "Convert Java code files to PDF",
     color: "from-orange-600 to-red-600",
   },
+  {
+    id: "python-to-pdf",
+    name: "Python to PDF",
+    icon: FileCode,
+    description: "Convert Python source files to PDF",
+    color: "from-blue-500 to-indigo-600",
+  },
 ];
 
 export default function Home() {
