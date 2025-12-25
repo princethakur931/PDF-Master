@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Code,
 } from "lucide-react";
 
 const tools = [
@@ -145,6 +146,13 @@ const tools = [
     icon: PenTool,
     description: "Add signature to PDF",
     color: "from-fuchsia-500 to-pink-500",
+  },
+  {
+    id: "python-to-pdf",
+    name: "Python to PDF",
+    icon: Code,
+    description: "Convert Python code to PDF",
+    color: "from-yellow-500 to-green-500",
   },
 ];
 

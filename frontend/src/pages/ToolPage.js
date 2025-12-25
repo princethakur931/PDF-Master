@@ -137,6 +137,12 @@ const toolConfigs = {
     inputLabel: "Signature Text",
     inputPlaceholder: "Your Name",
   },
+  "python-to-pdf": {
+    title: "Python to PDF",
+    acceptFiles: ".py",
+    multiple: false,
+    hasExtraInput: false,
+  },
 };
 
 export default function ToolPage() {

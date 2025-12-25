@@ -17,9 +17,13 @@ from PIL import Image
 import img2pdf
 from pdf2docx import Converter
 import io
-from reportlab.lib.pagesizes import letter
+from reportlab.lib.pagesizes import letter, A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
+from reportlab.lib.units import inch
+from reportlab.lib.colors import HexColor
 import openpyxl
 from docx import Document
 import pytesseract
@@ -673,6 +677,74 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
     except Exception as e:
         cleanup_files(temp_file, signature_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/python-to-pdf")
+async def python_to_pdf(file: UploadFile = File(...)):
+    """Convert a Python source code file to PDF with syntax formatting"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.py'):
+            raise HTTPException(status_code=400, detail="File must be a Python (.py) file")
+        
+        # Save uploaded file
+        temp_file = await save_upload_file(file)
+        
+        # Read the Python source code
+        with open(temp_file, 'r', encoding='utf-8', errors='replace') as f:
+            python_code = f.read()
+        
+        # Create PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_code.pdf"
+        
+        doc = SimpleDocTemplate(
+            str(output_file),
+            pagesize=letter,
+            rightMargin=50,
+            leftMargin=50,
+            topMargin=50,
+            bottomMargin=50,
+        )
+        
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Code style - using monospace font, clean output
+        code_style = ParagraphStyle(
+            'CodeStyle',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=10,
+            leading=14,
+            textColor=HexColor('#2d3748'),
+        )
+        
+        # Process code lines - just the code, no line numbers or headings
+        lines = python_code.split('\n')
+        for line in lines:
+            try:
+                elements.append(Preformatted(line if line else ' ', code_style))
+            except:
+                elements.append(Spacer(1, 0.1*inch))
+        
+        # Build PDF
+        doc.build(elements)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except HTTPException:
+        cleanup_files(temp_file, output_file)
+        raise
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=f"Error converting Python to PDF: {str(e)}")
 
 # Include the router in the main app
 app.include_router(api_router)
