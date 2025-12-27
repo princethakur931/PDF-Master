@@ -127,8 +127,13 @@ const toolConfigs = {
     acceptFiles: ".pdf",
     multiple: false,
     hasExtraInput: true,
-    inputLabel: "Watermark Text",
-    inputPlaceholder: "CONFIDENTIAL",
+    hasWatermarkOptions: true,
+    inputLabel: "Watermark Type",
+    inputType: "select",
+    options: [
+      { value: "text", label: "Text Watermark" },
+      { value: "image", label: "Image Watermark (PNG/JPG/JPEG)" },
+    ],
   },
   protect: {
     title: "Protect PDF",
@@ -198,6 +203,11 @@ export default function ToolPage() {
   const [files, setFiles] = useState([]);
   const [extraInput, setExtraInput] = useState("");
   const [extraInput2, setExtraInput2] = useState("");
+  const [watermarkImage, setWatermarkImage] = useState(null);
+  const [watermarkText, setWatermarkText] = useState("");
+  const [watermarkOpacity, setWatermarkOpacity] = useState(30);
+  const [watermarkRotation, setWatermarkRotation] = useState(45);
+  const [watermarkSize, setWatermarkSize] = useState(50);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -252,6 +262,18 @@ export default function ToolPage() {
       return;
     }
 
+    // Special validation for watermark
+    if (toolId === "watermark") {
+      if (extraInput === "text" && !watermarkText) {
+        toast.error("Please provide watermark text.");
+        return;
+      }
+      if (extraInput === "image" && !watermarkImage) {
+        toast.error("Please upload a watermark image.");
+        return;
+      }
+    }
+
     setProcessing(true);
     setError(null);
     setResult(null);
@@ -272,7 +294,18 @@ export default function ToolPage() {
         } else if (toolId === "rotate") {
           formData.append("angle", extraInput);
         } else if (toolId === "watermark") {
-          formData.append("text", extraInput);
+          // Handle watermark options
+          if (extraInput === "text") {
+            formData.append("text", watermarkText);
+          } else if (extraInput === "image" && watermarkImage) {
+            formData.append("watermark_image", watermarkImage);
+          }
+          // Add position (always center), opacity, rotation, and size
+          // Convert 0-100 scale to actual values
+          formData.append("position", "center");
+          formData.append("opacity", watermarkOpacity / 100); // Convert to 0-1
+          formData.append("rotation", (watermarkRotation * 360) / 100); // Convert to 0-360
+          formData.append("size", (watermarkSize * 80) / 100 + 20); // Convert to 20-100
         } else if (toolId === "protect" || toolId === "unlock") {
           formData.append("password", extraInput);
         } else if (toolId === "sign") {
@@ -332,6 +365,11 @@ export default function ToolPage() {
     setFiles([]);
     setExtraInput("");
     setExtraInput2("");
+    setWatermarkImage(null);
+    setWatermarkText("");
+    setWatermarkOpacity(30);
+    setWatermarkRotation(45);
+    setWatermarkSize(50);
     setResult(null);
     setError(null);
   };
@@ -603,6 +641,273 @@ export default function ToolPage() {
                               </SelectContent>
                             </Select>
                           </div>
+                        )}
+
+                        {/* Watermark-specific options */}
+                        {config.hasWatermarkOptions && (
+                          <>
+                            {extraInput === "text" && (
+                              <div>
+                                <Label
+                                  htmlFor="watermark-text"
+                                  className={
+                                    isDarkMode ? "text-white" : "text-gray-900"
+                                  }
+                                >
+                                  Watermark Text
+                                </Label>
+                                <Input
+                                  id="watermark-text"
+                                  type="text"
+                                  placeholder="CONFIDENTIAL"
+                                  value={watermarkText}
+                                  onChange={e =>
+                                    setWatermarkText(e.target.value)
+                                  }
+                                  className={
+                                    isDarkMode
+                                      ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                      : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            {extraInput === "image" && (
+                              <div className="mb-4">
+                                <Label
+                                  htmlFor="watermark-image"
+                                  className={
+                                    isDarkMode
+                                      ? "text-white mb-2 block"
+                                      : "text-gray-900 mb-2 block"
+                                  }
+                                >
+                                  Watermark Image
+                                </Label>
+                                <div className="relative">
+                                  <Input
+                                    id="watermark-image"
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg"
+                                    onChange={e =>
+                                      setWatermarkImage(e.target.files[0])
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white w-full h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
+                                        : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 w-full h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
+                                    }
+                                  />
+                                </div>
+                                {watermarkImage && (
+                                  <p className="text-sm text-green-400 mt-2 flex items-center">
+                                    <span className="mr-2">✓</span>
+                                    <span className="font-medium">
+                                      {watermarkImage.name}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-3 gap-4 mt-6">
+                              {/* Opacity Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Opacity
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkOpacity(
+                                        Math.max(0, watermarkOpacity - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkOpacity}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkOpacity(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkOpacity(
+                                        Math.min(100, watermarkOpacity + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Rotation Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Rotation
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkRotation(
+                                        Math.max(0, watermarkRotation - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkRotation}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkRotation(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkRotation(
+                                        Math.min(100, watermarkRotation + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Size Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Size
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkSize(
+                                        Math.max(0, watermarkSize - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkSize}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkSize(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkSize(
+                                        Math.min(100, watermarkSize + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
                         )}
                       </>
                     ) : (
