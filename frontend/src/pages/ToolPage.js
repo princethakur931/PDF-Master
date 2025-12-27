@@ -183,6 +183,7 @@ const toolConfigs = {
       { value: "bottom-center", label: "Bottom Center" },
       { value: "bottom-right", label: "Bottom Right" },
     ],
+  },
   "python-to-pdf": {
     title: "Python to PDF",
     acceptFiles: ".py",
