@@ -212,7 +212,6 @@ export default function ToolPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem("theme");
     return savedTheme === "light" ? false : true;
@@ -363,10 +362,16 @@ export default function ToolPage() {
     }
   };
 
-  const handleShare = async (platform) => {
+  const handleShare = async () => {
     try {
       if (!result || !result.url) {
         toast.error("No file available to share");
+        return;
+      }
+
+      // Check if Web Share API is available
+      if (!navigator.share) {
+        toast.error("Sharing is not supported on this browser. Please use download instead.");
         return;
       }
 
@@ -375,64 +380,28 @@ export default function ToolPage() {
       const blob = await response.blob();
       const file = new File([blob], result.filename, { type: blob.type });
 
-      // Try to use Web Share API first (works on mobile and some desktop browsers)
-      if (navigator.share) {
-        try {
-          // Check if sharing files is supported
-          if (navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              files: [file],
-              title: "PDF Master",
-              text: `Sharing ${result.filename}`
-            });
-            toast.success("File shared successfully!");
-            setShowShareMenu(false);
-            return;
-          }
-        } catch (shareError) {
-          console.log("Web Share API failed, trying alternative methods");
-        }
+      // Check if sharing files is supported
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        toast.error("File sharing is not supported on this device. Please use download instead.");
+        return;
       }
 
-      // For desktop browsers without file share support, download and prompt user
-      toast.info(`Please download the file first, then share it via ${platform}`);
+      // Share the file directly without downloading
+      await navigator.share({
+        files: [file],
+        title: "PDF Master",
+        text: `Sharing ${result.filename}`
+      });
       
-      // Automatically trigger download
-      const a = document.createElement("a");
-      a.href = result.url;
-      a.download = result.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      // Open the platform for manual sharing
-      let shareUrl = "";
-      const fileName = encodeURIComponent(result.filename);
-
-      switch (platform) {
-        case "whatsapp":
-          shareUrl = `https://wa.me/`;
-          break;
-        case "gmail":
-          shareUrl = `https://mail.google.com/mail/?view=cm&su=${fileName}`;
-          break;
-        case "telegram":
-          shareUrl = `https://web.telegram.org/`;
-          break;
-        default:
-          toast.error("Invalid platform selected");
-          return;
-      }
-
-      setTimeout(() => {
-        window.open(shareUrl, "_blank");
-        toast.success(`Opening ${platform}. Please attach the downloaded file.`);
-      }, 1000);
-
-      setShowShareMenu(false);
+      toast.success("File shared successfully!");
     } catch (error) {
-      console.error("Share error:", error);
-      toast.error("Failed to share file. Please download and share manually.");
+      // User cancelled the share
+      if (error.name === "AbortError") {
+        toast.info("Share cancelled");
+      } else {
+        console.error("Share error:", error);
+        toast.error("Failed to share file. Please try download instead.");
+      }
     }
   };
 
@@ -447,7 +416,6 @@ export default function ToolPage() {
     setWatermarkSize(50);
     setResult(null);
     setError(null);
-    setShowShareMenu(false);
   };
 
   if (!config) {
@@ -1129,68 +1097,16 @@ export default function ToolPage() {
                         <Download className="mr-2 h-5 w-5" />
                         Download File
                       </Button>
-                      
-                      {/* Share Button with Dropdown */}
-                      <div className="relative">
-                        <Button
-                          onClick={() => setShowShareMenu(!showShareMenu)}
-                          className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-6 rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300"
-                        >
-                          <Share2 className="mr-2 h-5 w-5" />
-                          Share File
-                        </Button>
-                        
-                        {showShareMenu && (
-                          <div className={
-                            isDarkMode
-                              ? "absolute bottom-full left-0 right-0 mb-2 bg-gray-800 border border-white/10 rounded-xl shadow-xl overflow-hidden z-50"
-                              : "absolute bottom-full left-0 right-0 mb-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden z-50"
-                          }>
-                            <button
-                              onClick={() => handleShare("whatsapp")}
-                              className={
-                                isDarkMode
-                                  ? "w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-3 text-white"
-                                  : "w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-900"
-                              }
-                            >
-                              <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-sm">
-                                W
-                              </div>
-                              <span className="font-medium">Share via WhatsApp</span>
-                            </button>
-                            
-                            <button
-                              onClick={() => handleShare("gmail")}
-                              className={
-                                isDarkMode
-                                  ? "w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-3 text-white border-t border-white/10"
-                                  : "w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-900 border-t border-gray-200"
-                              }
-                            >
-                              <div className="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-sm">
-                                G
-                              </div>
-                              <span className="font-medium">Share via Gmail</span>
-                            </button>
-                            
-                            <button
-                              onClick={() => handleShare("telegram")}
-                              className={
-                                isDarkMode
-                                  ? "w-full px-4 py-3 text-left hover:bg-white/5 transition-colors flex items-center gap-3 text-white border-t border-white/10"
-                                  : "w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3 text-gray-900 border-t border-gray-200"
-                              }
-                            >
-                              <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
-                                T
-                              </div>
-                              <span className="font-medium">Share via Telegram</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      
+
+                      {/* Native Share Button */}
+                      <Button
+                        onClick={handleShare}
+                        className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-6 rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                      >
+                        <Share2 className="mr-2 h-5 w-5" />
+                        Share File
+                      </Button>
+
                       <Button
                         onClick={handleReset}
                         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
