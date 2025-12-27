@@ -175,6 +175,8 @@ const tools = [
     icon: Hash,
     description: "Add page numbers to PDF",
     color: "from-blue-600 to-cyan-600",
+  },
+  {
     id: "python-to-pdf",
     name: "Python to PDF",
     icon: FileCode,
