@@ -14,6 +14,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import axios from "axios";
 
@@ -155,6 +162,27 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "add-page-numbers": {
+    title: "Add Page Numbers",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: true,
+    inputType: "select",
+    inputLabel: "Page Number Format",
+    options: [
+      { value: "numeric", label: "1, 2, 3, 4, ..." },
+      { value: "numeric-page", label: "Page 1, Page 2, Page 3, ..." },
+      { value: "roman-lower", label: "i, ii, iii, iv, ..." },
+      { value: "roman-lower-page", label: "Page i, Page ii, Page iii, ..." },
+      { value: "roman-upper", label: "I, II, III, IV, ..." },
+      { value: "roman-upper-page", label: "Page I, Page II, Page III, ..." },
+    ],
+    inputLabel2: "Page Number Position",
+    options2: [
+      { value: "bottom-left", label: "Bottom Left" },
+      { value: "bottom-center", label: "Bottom Center" },
+      { value: "bottom-right", label: "Bottom Right" },
+    ],
   "python-to-pdf": {
     title: "Python to PDF",
     acceptFiles: ".py",
@@ -168,6 +196,7 @@ export default function ToolPage() {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [extraInput, setExtraInput] = useState("");
+  const [extraInput2, setExtraInput2] = useState("");
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -193,6 +222,13 @@ export default function ToolPage() {
       setFiles(acceptedFiles);
       setError(null);
       setResult(null);
+      // Set default values for select inputs
+      if (config?.inputType === "select" && config?.options) {
+        setExtraInput(config.options[0].value);
+      }
+      if (config?.options2) {
+        setExtraInput2(config.options2[1].value); // Default to bottom-center
+      }
     },
     onDropRejected: rejections => {
       const error = rejections[0]?.errors[0];
@@ -240,6 +276,9 @@ export default function ToolPage() {
           formData.append("password", extraInput);
         } else if (toolId === "sign") {
           formData.append("signature_text", extraInput);
+        } else if (toolId === "add-page-numbers") {
+          formData.append("format", extraInput);
+          formData.append("position", extraInput2);
         }
       }
 
@@ -291,6 +330,7 @@ export default function ToolPage() {
   const handleReset = () => {
     setFiles([]);
     setExtraInput("");
+    setExtraInput2("");
     setResult(null);
     setError(null);
   };
@@ -488,26 +528,107 @@ export default function ToolPage() {
 
                 {/* Extra Input */}
                 {config.hasExtraInput && (
-                  <div className="mt-6">
-                    <Label
-                      htmlFor="extra-input"
-                      className={isDarkMode ? "text-white" : "text-gray-900"}
-                    >
-                      {config.inputLabel}
-                    </Label>
-                    <Input
-                      id="extra-input"
-                      type={config.inputType || "text"}
-                      placeholder={config.inputPlaceholder}
-                      value={extraInput}
-                      onChange={e => setExtraInput(e.target.value)}
-                      className={
-                        isDarkMode
-                          ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white"
-                          : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900"
-                      }
-                      data-testid="extra-input"
-                    />
+                  <div className="mt-6 space-y-4">
+                    {config.inputType === "select" ? (
+                      <>
+                        <div>
+                          <Label
+                            htmlFor="extra-input"
+                            className={
+                              isDarkMode ? "text-white" : "text-gray-900"
+                            }
+                          >
+                            {config.inputLabel}
+                          </Label>
+                          <Select
+                            value={extraInput}
+                            onValueChange={setExtraInput}
+                          >
+                            <SelectTrigger
+                              className={
+                                isDarkMode
+                                  ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                  : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                              }
+                              data-testid="extra-input"
+                            >
+                              <SelectValue placeholder="Select format" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {config.options?.map(option => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {config.options2 && (
+                          <div>
+                            <Label
+                              htmlFor="extra-input-2"
+                              className={
+                                isDarkMode ? "text-white" : "text-gray-900"
+                              }
+                            >
+                              {config.inputLabel2}
+                            </Label>
+                            <Select
+                              value={extraInput2}
+                              onValueChange={setExtraInput2}
+                            >
+                              <SelectTrigger
+                                className={
+                                  isDarkMode
+                                    ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                    : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                                }
+                                data-testid="extra-input-2"
+                              >
+                                <SelectValue placeholder="Select position" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {config.options2?.map(option => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div>
+                        <Label
+                          htmlFor="extra-input"
+                          className={
+                            isDarkMode ? "text-white" : "text-gray-900"
+                          }
+                        >
+                          {config.inputLabel}
+                        </Label>
+                        <Input
+                          id="extra-input"
+                          type={config.inputType || "text"}
+                          placeholder={config.inputPlaceholder}
+                          value={extraInput}
+                          onChange={e => setExtraInput(e.target.value)}
+                          className={
+                            isDarkMode
+                              ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white"
+                              : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900"
+                          }
+                          data-testid="extra-input"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 

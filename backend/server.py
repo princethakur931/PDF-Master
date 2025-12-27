@@ -1054,6 +1054,13 @@ async def java_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/add-page-numbers")
+async def add_page_numbers(
+    file: UploadFile = File(...),
+    format: str = Form(...),
+    position: str = Form(...)
+):
+    """Add page numbers to PDF pages"""
 @api_router.post("/python-to-pdf")
 async def python_to_pdf(file: UploadFile = File(...)):
     """Convert Python source code file to PDF with formatted text and line numbers"""
@@ -1061,6 +1068,100 @@ async def python_to_pdf(file: UploadFile = File(...)):
     output_file = None
     
     try:
+        temp_file = await save_upload_file(file)
+        
+        # Read the original PDF
+        pdf_reader = PdfReader(str(temp_file))
+        pdf_writer = PdfWriter()
+        
+        total_pages = len(pdf_reader.pages)
+        
+        # Helper function to convert number to roman numerals
+        def to_roman(num):
+            val = [
+                1000, 900, 500, 400,
+                100, 90, 50, 40,
+                10, 9, 5, 4,
+                1
+            ]
+            syms = [
+                "M", "CM", "D", "CD",
+                "C", "XC", "L", "XL",
+                "X", "IX", "V", "IV",
+                "I"
+            ]
+            roman_num = ''
+            i = 0
+            while num > 0:
+                for _ in range(num // val[i]):
+                    roman_num += syms[i]
+                    num -= val[i]
+                i += 1
+            return roman_num
+        
+        # Process each page
+        for page_num in range(total_pages):
+            # Get the page from original PDF
+            page = pdf_reader.pages[page_num]
+            page_width = float(page.mediabox.width)
+            page_height = float(page.mediabox.height)
+            
+            # Create a new PDF with the page number
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=(page_width, page_height))
+            
+            # Determine page number text based on format
+            page_number = page_num + 1
+            if format == "numeric":
+                page_text = str(page_number)
+            elif format == "numeric-page":
+                page_text = f"Page {page_number}"
+            elif format == "roman-lower":
+                page_text = to_roman(page_number).lower()
+            elif format == "roman-lower-page":
+                page_text = f"Page {to_roman(page_number).lower()}"
+            elif format == "roman-upper":
+                page_text = to_roman(page_number)
+            elif format == "roman-upper-page":
+                page_text = f"Page {to_roman(page_number)}"
+            else:
+                page_text = str(page_number)
+            
+            # Set font and determine position
+            can.setFont("Helvetica", 10)
+            text_width = can.stringWidth(page_text, "Helvetica", 10)
+            
+            # Position the page number (bottom)
+            y_position = 20  # 20 points from bottom
+            
+            if position == "bottom-left":
+                x_position = 40  # 40 points from left
+            elif position == "bottom-center":
+                x_position = (page_width - text_width) / 2
+            elif position == "bottom-right":
+                x_position = page_width - text_width - 40  # 40 points from right
+            else:
+                x_position = (page_width - text_width) / 2  # default to center
+            
+            # Draw the page number
+            can.drawString(x_position, y_position, page_text)
+            can.save()
+            
+            # Move to the beginning of the BytesIO buffer
+            packet.seek(0)
+            
+            # Read the page number overlay
+            overlay_pdf = PdfReader(packet)
+            overlay_page = overlay_pdf.pages[0]
+            
+            # Merge the overlay with the original page
+            page.merge_page(overlay_page)
+            pdf_writer.add_page(page)
+        
+        # Save the output PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_numbered.pdf"
+        with open(output_file, "wb") as f:
+            pdf_writer.write(f)
         # Validate file extension
         if not file.filename.lower().endswith('.py'):
             raise HTTPException(status_code=400, detail="File must be a .py file")
@@ -1113,6 +1214,10 @@ async def python_to_pdf(file: UploadFile = File(...)):
         return FileResponse(
             output_file,
             media_type="application/pdf",
+            filename="numbered.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
             filename=f"{Path(file.filename).stem}.pdf",
             background=lambda: cleanup_files(temp_file, output_file)
         )
