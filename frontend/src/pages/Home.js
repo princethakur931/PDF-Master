@@ -175,6 +175,11 @@ const tools = [
     icon: Hash,
     description: "Add page numbers to PDF",
     color: "from-blue-600 to-cyan-600",
+    id: "python-to-pdf",
+    name: "Python to PDF",
+    icon: FileCode,
+    description: "Convert Python source files to PDF",
+    color: "from-blue-500 to-indigo-600",
   },
 ];
 
@@ -217,6 +222,7 @@ export default function Home() {
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
+      { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
