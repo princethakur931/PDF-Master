@@ -582,11 +582,20 @@ async def ocr_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/watermark")
-async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
-    """Add watermark to PDF"""
+async def watermark_pdf(
+    file: UploadFile = File(...), 
+    text: Optional[str] = Form(None),
+    watermark_image: Optional[UploadFile] = File(None),
+    position: str = Form("center"),
+    opacity: float = Form(0.3),
+    rotation: int = Form(45),
+    size: int = Form(50)
+):
+    """Add text or image watermark to PDF"""
     temp_file = None
     output_file = None
     watermark_file = None
+    watermark_image_file = None
     
     try:
         temp_file = await save_upload_file(file)
@@ -597,11 +606,60 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         width, height = letter
         
         c.saveState()
-        c.setFont("Helvetica", 50)
-        c.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3)
-        c.translate(width/2, height/2)
-        c.rotate(45)
-        c.drawCentredString(0, 0, text)
+        
+        # Calculate position
+        if position == "center":
+            x_pos, y_pos = width/2, height/2
+        elif position == "top-left":
+            x_pos, y_pos = width*0.25, height*0.75
+        elif position == "top-right":
+            x_pos, y_pos = width*0.75, height*0.75
+        elif position == "bottom-left":
+            x_pos, y_pos = width*0.25, height*0.25
+        elif position == "bottom-right":
+            x_pos, y_pos = width*0.75, height*0.25
+        else:
+            x_pos, y_pos = width/2, height/2
+        
+        c.translate(x_pos, y_pos)
+        c.rotate(rotation)
+        
+        # Check if image watermark is provided
+        if watermark_image and watermark_image.filename:
+            # Save watermark image
+            watermark_image_file = await save_upload_file(watermark_image)
+            
+            # Open and resize image
+            img = Image.open(str(watermark_image_file))
+            
+            # Calculate image dimensions based on size parameter
+            aspect_ratio = img.width / img.height
+            if aspect_ratio > 1:
+                img_width = size * 2
+                img_height = img_width / aspect_ratio
+            else:
+                img_height = size * 2
+                img_width = img_height * aspect_ratio
+            
+            # Set opacity
+            c.setFillAlpha(opacity)
+            
+            # Draw image (centered on the position)
+            c.drawImage(
+                ImageReader(img),
+                -img_width/2, -img_height/2,
+                width=img_width, height=img_height,
+                mask='auto',
+                preserveAspectRatio=True
+            )
+        elif text:
+            # Text watermark
+            c.setFont("Helvetica", size)
+            c.setFillColorRGB(0.5, 0.5, 0.5, alpha=opacity)
+            c.drawCentredString(0, 0, text)
+        else:
+            raise HTTPException(status_code=400, detail="Either text or watermark_image must be provided")
+        
         c.restoreState()
         c.save()
         
@@ -624,11 +682,11 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
             output_file,
             media_type="application/pdf",
             filename="watermarked.pdf",
-            background=lambda: cleanup_files(temp_file, watermark_file, output_file)
+            background=lambda: cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
         )
     
     except Exception as e:
-        cleanup_files(temp_file, watermark_file, output_file)
+        cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/protect")
