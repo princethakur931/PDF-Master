@@ -25,6 +25,7 @@ import {
   X,
   ChevronRight,
   FileCode,
+  Hash,
 } from "lucide-react";
 
 const tools = [
@@ -113,6 +114,20 @@ const tools = [
     color: "from-emerald-500 to-green-500",
   },
   {
+    id: "cpp-to-pdf",
+    name: "CPP to PDF",
+    icon: FileText,
+    description: "Convert C++ code to PDF",
+    color: "from-slate-500 to-gray-600",
+  },
+  {
+    id: "ipynb-to-pdf",
+    name: "Notebook to PDF",
+    icon: FileText,
+    description: "Convert Jupyter Notebook to PDF",
+    color: "from-orange-600 to-red-600",
+  },
+  {
     id: "ocr",
     name: "OCR PDF",
     icon: FileSearch,
@@ -161,6 +176,19 @@ const tools = [
     description: "Convert SQL code files to PDF",
     color: "from-blue-600 to-cyan-600",
   },
+    id: "add-page-numbers",
+    name: "Add Page Numbers",
+    icon: Hash,
+    description: "Add page numbers to PDF",
+    color: "from-blue-600 to-cyan-600",
+  },
+  {
+    id: "python-to-pdf",
+    name: "Python to PDF",
+    icon: FileCode,
+    description: "Convert Python source files to PDF",
+    color: "from-blue-500 to-indigo-600",
+  },
 ];
 
 export default function Home() {
@@ -203,6 +231,9 @@ export default function Home() {
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
       { id: "sql-to-pdf", name: "SQL to PDF", icon: FileCode },
+      { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
+      { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
+      { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
@@ -218,6 +249,7 @@ export default function Home() {
     other: [
       { id: "watermark", name: "Add Watermark", icon: Droplet },
       { id: "ocr", name: "OCR PDF", icon: FileSearch },
+      { id: "add-page-numbers", name: "Add Page Numbers", icon: Hash },
     ],
   };
 
