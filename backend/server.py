@@ -1061,9 +1061,6 @@ async def add_page_numbers(
     position: str = Form(...)
 ):
     """Add page numbers to PDF pages"""
-@api_router.post("/python-to-pdf")
-async def python_to_pdf(file: UploadFile = File(...)):
-    """Convert Python source code file to PDF with formatted text and line numbers"""
     temp_file = None
     output_file = None
     
@@ -1162,6 +1159,25 @@ async def python_to_pdf(file: UploadFile = File(...)):
         output_file = UPLOAD_DIR / f"{uuid.uuid4()}_numbered.pdf"
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="numbered.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/python-to-pdf")
+async def python_to_pdf(file: UploadFile = File(...)):
+    """Convert Python source code file to PDF with formatted text and line numbers"""
+    temp_file = None
+    output_file = None
+    
+    try:
         # Validate file extension
         if not file.filename.lower().endswith('.py'):
             raise HTTPException(status_code=400, detail="File must be a .py file")
@@ -1214,10 +1230,6 @@ async def python_to_pdf(file: UploadFile = File(...)):
         return FileResponse(
             output_file,
             media_type="application/pdf",
-            filename="numbered.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
             filename=f"{Path(file.filename).stem}.pdf",
             background=lambda: cleanup_files(temp_file, output_file)
         )
