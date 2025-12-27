@@ -154,6 +154,13 @@ const tools = [
     description: "Convert Java code files to PDF",
     color: "from-orange-600 to-red-600",
   },
+  {
+    id: "sql-to-pdf",
+    name: "SQL to PDF",
+    icon: FileCode,
+    description: "Convert SQL code files to PDF",
+    color: "from-blue-600 to-cyan-600",
+  },
 ];
 
 export default function Home() {
@@ -195,6 +202,7 @@ export default function Home() {
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
+      { id: "sql-to-pdf", name: "SQL to PDF", icon: FileCode },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },

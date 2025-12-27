@@ -143,6 +143,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "sql-to-pdf": {
+    title: "SQL to PDF",
+    acceptFiles: ".sql",
+    multiple: false,
+    hasExtraInput: false,
+  },
 };
 
 export default function ToolPage() {
