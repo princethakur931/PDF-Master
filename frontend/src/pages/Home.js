@@ -183,6 +183,13 @@ const tools = [
     description: "Convert Python source files to PDF",
     color: "from-blue-500 to-indigo-600",
   },
+  {
+    id: "delete-pages",
+    name: "Delete Pages",
+    icon: Scissors,
+    description: "Remove specific pages from PDF",
+    color: "from-red-500 to-rose-600",
+  },
 ];
 
 export default function Home() {
@@ -217,6 +224,7 @@ export default function Home() {
       { id: "split", name: "Split PDF", icon: Scissors },
       { id: "compress", name: "Compress PDF", icon: Minimize2 },
       { id: "rotate", name: "Rotate PDF", icon: RotateCw },
+      { id: "delete-pages", name: "Delete Pages", icon: Scissors },
     ],
     convertToPdf: [
       { id: "jpg-to-pdf", name: "JPG to PDF", icon: ImageIcon },
