@@ -1299,6 +1299,95 @@ async def python_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/preview-pages")
+async def preview_pdf_pages(file: UploadFile = File(...)):
+    """Generate preview images for all pages in PDF"""
+    temp_file = None
+    preview_files = []
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Open PDF with PyMuPDF
+        import fitz
+        pdf_document = fitz.open(str(temp_file))
+        
+        # Generate previews for all pages
+        previews = []
+        for page_num in range(len(pdf_document)):
+            page = pdf_document[page_num]
+            # Render page to image with 150 DPI for better quality
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            
+            # Convert to base64 for JSON response
+            import base64
+            img_bytes = pix.tobytes("png")
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            
+            previews.append({
+                "pageNumber": page_num + 1,
+                "imageData": f"data:image/png;base64,{img_base64}",
+                "width": pix.width,
+                "height": pix.height
+            })
+        
+        pdf_document.close()
+        cleanup_files(temp_file)
+        
+        return JSONResponse(content={
+            "totalPages": len(previews),
+            "pages": previews
+        })
+    
+    except Exception as e:
+        cleanup_files(temp_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/delete-pages")
+async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = Form(...)):
+    """Delete specified pages from PDF"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Parse pages to delete (comma-separated list, e.g., "1,3,5")
+        pages_to_delete_list = [int(p.strip()) - 1 for p in pages_to_delete.split(',') if p.strip()]
+        
+        # Read PDF
+        pdf_reader = PdfReader(str(temp_file))
+        pdf_writer = PdfWriter()
+        
+        # Add all pages except the ones to delete
+        total_pages = len(pdf_reader.pages)
+        for page_num in range(total_pages):
+            if page_num not in pages_to_delete_list:
+                pdf_writer.add_page(pdf_reader.pages[page_num])
+        
+        # Check if all pages were deleted
+        if len(pdf_writer.pages) == 0:
+            raise HTTPException(status_code=400, detail="Cannot delete all pages. At least one page must remain.")
+        
+        # Save modified PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_deleted.pdf"
+        with open(output_file, "wb") as f:
+            pdf_writer.write(f)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="modified.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except ValueError as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Invalid page numbers format. Use comma-separated numbers (e.g., 1,3,5)")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Include the router in the main app
 app.include_router(api_router)
 

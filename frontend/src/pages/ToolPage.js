@@ -196,6 +196,13 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "delete-pages": {
+    title: "Delete Pages",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: false,
+    hasPageSelection: true,
+  },
 };
 
 export default function ToolPage() {
@@ -217,12 +224,48 @@ export default function ToolPage() {
     return savedTheme === "light" ? false : true;
   });
 
+  // States for delete-pages feature
+  const [pdfPages, setPdfPages] = useState([]);
+  const [selectedPages, setSelectedPages] = useState([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+
   // Save theme preference to localStorage
   useEffect(() => {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   const config = toolConfigs[toolId];
+
+  // Function to load PDF page previews
+  const loadPdfPreviews = async file => {
+    console.log("Loading PDF previews for:", file.name);
+    setLoadingPages(true);
+    setPdfPages([]);
+    setSelectedPages([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      console.log("Sending request to:", `${API}/preview-pages`);
+      const response = await axios.post(`${API}/preview-pages`, formData, {
+        timeout: 60000,
+      });
+
+      console.log("Preview response:", response.data);
+      setPdfPages(response.data.pages);
+      toast.success(`Loaded ${response.data.totalPages} pages`);
+    } catch (err) {
+      console.error("Preview error:", err);
+      console.error("Error details:", err.response?.data);
+      toast.error(
+        "Failed to load PDF previews: " +
+          (err.response?.data?.detail || err.message)
+      );
+    } finally {
+      setLoadingPages(false);
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: config?.acceptFiles
@@ -231,6 +274,10 @@ export default function ToolPage() {
     multiple: config?.multiple,
     maxSize: 10 * 1024 * 1024, // 10MB
     onDrop: acceptedFiles => {
+      console.log("Files dropped:", acceptedFiles);
+      console.log("Current toolId:", toolId);
+      console.log("Config hasPageSelection:", config?.hasPageSelection);
+
       setFiles(acceptedFiles);
       setError(null);
       setResult(null);
@@ -240,6 +287,14 @@ export default function ToolPage() {
       }
       if (config?.options2) {
         setExtraInput2(config.options2[1].value); // Default to bottom-center
+      }
+
+      // Load page previews for delete-pages tool
+      if (config?.hasPageSelection && acceptedFiles.length > 0) {
+        console.log("Loading page previews...");
+        loadPdfPreviews(acceptedFiles[0]);
+      } else {
+        console.log("Skipping page preview - condition not met");
       }
     },
     onDropRejected: rejections => {
@@ -261,6 +316,18 @@ export default function ToolPage() {
     if (config.hasExtraInput && !extraInput) {
       toast.error(`Please provide ${config.inputLabel}.`);
       return;
+    }
+
+    // Special validation for delete-pages
+    if (toolId === "delete-pages") {
+      if (selectedPages.length === 0) {
+        toast.error("Please select at least one page to delete.");
+        return;
+      }
+      if (selectedPages.length === pdfPages.length) {
+        toast.error("Cannot delete all pages. At least one page must remain.");
+        return;
+      }
     }
 
     // Special validation for watermark
@@ -317,6 +384,12 @@ export default function ToolPage() {
         }
       }
 
+      // Handle delete-pages
+      if (toolId === "delete-pages") {
+        const pagesToDelete = selectedPages.join(",");
+        formData.append("pages_to_delete", pagesToDelete);
+      }
+
       const response = await axios.post(`${API}/${toolId}`, formData, {
         responseType: toolId === "ocr" ? "json" : "blob",
         timeout: 60000,
@@ -371,7 +444,9 @@ export default function ToolPage() {
 
       // Check if Web Share API is available
       if (!navigator.share) {
-        toast.error("Sharing is not supported on this browser. Please use download instead.");
+        toast.error(
+          "Sharing is not supported on this browser. Please use download instead."
+        );
         return;
       }
 
@@ -382,7 +457,9 @@ export default function ToolPage() {
 
       // Check if sharing files is supported
       if (navigator.canShare && !navigator.canShare({ files: [file] })) {
-        toast.error("File sharing is not supported on this device. Please use download instead.");
+        toast.error(
+          "File sharing is not supported on this device. Please use download instead."
+        );
         return;
       }
 
@@ -390,9 +467,9 @@ export default function ToolPage() {
       await navigator.share({
         files: [file],
         title: "PDF Master",
-        text: `Sharing ${result.filename}`
+        text: `Sharing ${result.filename}`,
       });
-      
+
       toast.success("File shared successfully!");
     } catch (error) {
       // User cancelled the share
@@ -416,6 +493,8 @@ export default function ToolPage() {
     setWatermarkSize(50);
     setResult(null);
     setError(null);
+    setPdfPages([]);
+    setSelectedPages([]);
   };
 
   if (!config) {
@@ -979,6 +1058,125 @@ export default function ToolPage() {
                         />
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Page Selection for delete-pages */}
+                {config?.hasPageSelection && pdfPages.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <Label
+                        className={isDarkMode ? "text-white" : "text-gray-900"}
+                      >
+                        Select Pages to Delete ({selectedPages.length} selected)
+                      </Label>
+                      <div className="space-x-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setSelectedPages(pdfPages.map(p => p.pageNumber))
+                          }
+                          className={
+                            isDarkMode ? "text-white border-white/10" : ""
+                          }
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedPages([])}
+                          className={
+                            isDarkMode ? "text-white border-white/10" : ""
+                          }
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <div
+                      className={`max-h-[400px] overflow-y-auto rounded-xl p-4 ${
+                        isDarkMode
+                          ? "bg-white/5"
+                          : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {pdfPages.map(page => (
+                          <div
+                            key={page.pageNumber}
+                            onClick={() => {
+                              setSelectedPages(prev =>
+                                prev.includes(page.pageNumber)
+                                  ? prev.filter(p => p !== page.pageNumber)
+                                  : [...prev, page.pageNumber]
+                              );
+                            }}
+                            className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedPages.includes(page.pageNumber)
+                                ? "border-red-500 shadow-lg shadow-red-500/25"
+                                : isDarkMode
+                                ? "border-white/10 hover:border-white/30"
+                                : "border-gray-200 hover:border-gray-400"
+                            }`}
+                          >
+                            <img
+                              src={page.imageData}
+                              alt={`Page ${page.pageNumber}`}
+                              className="w-full h-auto"
+                            />
+                            <div
+                              className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                selectedPages.includes(page.pageNumber)
+                                  ? "bg-red-500 border-red-500"
+                                  : isDarkMode
+                                  ? "bg-white/10 border-white/30"
+                                  : "bg-white border-gray-300"
+                              }`}
+                            >
+                              {selectedPages.includes(page.pageNumber) && (
+                                <svg
+                                  className="w-4 h-4 text-white"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                            </div>
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 py-2 text-center text-sm font-medium ${
+                                selectedPages.includes(page.pageNumber)
+                                  ? "bg-red-500/90 text-white"
+                                  : isDarkMode
+                                  ? "bg-black/50 text-white"
+                                  : "bg-white/90 text-gray-900"
+                              }`}
+                            >
+                              Page {page.pageNumber}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {loadingPages && (
+                  <div className="mt-6 flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 text-indigo-500 animate-spin mr-3" />
+                    <p
+                      className={isDarkMode ? "text-gray-400" : "text-gray-600"}
+                    >
+                      Loading page previews...
+                    </p>
                   </div>
                 )}
 
