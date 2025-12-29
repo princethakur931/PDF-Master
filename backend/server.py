@@ -34,6 +34,8 @@ import nbformat
 from nbconvert import PDFExporter
 from nbconvert.preprocessors import ExecutePreprocessor
 import subprocess
+from xml.etree import ElementTree as ET
+from xml.dom import minidom
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1120,6 +1122,70 @@ async def python_to_pdf(file: UploadFile = File(...)):
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=400, detail="Unable to read Python file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/xml-to-pdf")
+async def xml_to_pdf(file: UploadFile = File(...)):
+    """Convert XML file to PDF with formatted, indented markup"""
+    temp_file = None
+    output_file = None
+
+    try:
+        if not file.filename.lower().endswith('.xml'):
+            raise HTTPException(status_code=400, detail="File must be a .xml file")
+
+        temp_file = await save_upload_file(file)
+
+        try:
+            tree = ET.parse(temp_file)
+            root = tree.getroot()
+            pretty_xml = minidom.parseString(ET.tostring(root, encoding='unicode')).toprettyxml(indent="  ")
+        except ET.ParseError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid XML file: {str(e)}")
+
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_xml.pdf"
+
+        # Render the pretty-printed XML into the PDF using a monospace font
+        c = canvas.Canvas(str(output_file), pagesize=letter)
+        width, height = letter
+        margin = 50
+        y_position = height - margin
+        line_height = 12
+        font_size = 9
+        max_chars = 110
+
+        c.setFont("Courier", font_size)
+
+        for line in pretty_xml.split('\n'):
+            if not line.strip():
+                y_position -= line_height
+                continue
+
+            # Truncate long lines to keep layout readable
+            display_line = line if len(line) <= max_chars else f"{line[:max_chars]}..."
+
+            if y_position < margin + 20:
+                c.showPage()
+                c.setFont("Courier", font_size)
+                y_position = height - margin
+
+            c.drawString(margin, y_position, display_line)
+            y_position -= line_height
+
+        c.save()
+
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+
+    except HTTPException:
+        cleanup_files(temp_file, output_file)
+        raise
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))

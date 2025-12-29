@@ -113,6 +113,13 @@ const tools = [
     color: "from-emerald-500 to-green-500",
   },
   {
+    id: "xml-to-pdf",
+    name: "XML to PDF",
+    icon: FileCode,
+    description: "Convert XML files to PDF",
+    color: "from-indigo-600 to-blue-700",
+  },
+  {
     id: "cpp-to-pdf",
     name: "CPP to PDF",
     icon: FileText,
@@ -215,6 +222,7 @@ export default function Home() {
       { id: "png-to-pdf", name: "PNG to PDF", icon: FileImage },
       { id: "word-to-pdf", name: "Word to PDF", icon: FileText },
       { id: "excel-to-pdf", name: "Excel to PDF", icon: FileSpreadsheet },
+      { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
       { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },

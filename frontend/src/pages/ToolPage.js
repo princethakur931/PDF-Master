@@ -97,6 +97,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "xml-to-pdf": {
+    title: "XML to PDF",
+    acceptFiles: ".xml",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "cpp-to-pdf": {
     title: "CPP to PDF",
     acceptFiles: ".cpp,.cc,.cxx,.h,.hpp",
@@ -255,14 +261,33 @@ export default function ToolPage() {
         const blob = new Blob([response.data]);
         const url = window.URL.createObjectURL(blob);
 
-        // Determine output file extension based on conversion direction
-        let extension = "pdf";
-        if (toolId === "pdf-to-jpg") extension = "jpg";
-        else if (toolId === "pdf-to-png") extension = "png";
-        else if (toolId === "pdf-to-word") extension = "docx";
-        else if (toolId === "pdf-to-excel") extension = "xlsx";
+        // Try to get filename from Content-Disposition header
+        let filename = "output.pdf";
+        const contentDisposition = response.headers["content-disposition"];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1];
+          }
+        } else {
+          // Fallback: determine output file extension based on conversion direction
+          let extension = "pdf";
+          if (toolId === "pdf-to-jpg") extension = "jpg";
+          else if (toolId === "pdf-to-png") extension = "png";
+          else if (toolId === "pdf-to-word") extension = "docx";
+          else if (toolId === "pdf-to-excel") extension = "xlsx";
+          
+          // For conversions to PDF, use original filename if available
+          if (extension === "pdf" && files.length > 0) {
+            const originalName = files[0].name;
+            const nameWithoutExt = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
+            filename = `${nameWithoutExt}.${extension}`;
+          } else {
+            filename = `output.${extension}`;
+          }
+        }
 
-        setResult({ type: "file", url, filename: `output.${extension}` });
+        setResult({ type: "file", url, filename });
         toast.success("Processing complete!");
       }
     } catch (err) {
