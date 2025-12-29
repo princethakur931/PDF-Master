@@ -584,11 +584,20 @@ async def ocr_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/watermark")
-async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
-    """Add watermark to PDF"""
+async def watermark_pdf(
+    file: UploadFile = File(...), 
+    text: Optional[str] = Form(None),
+    watermark_image: Optional[UploadFile] = File(None),
+    position: str = Form("center"),
+    opacity: float = Form(0.3),
+    rotation: int = Form(45),
+    size: int = Form(50)
+):
+    """Add text or image watermark to PDF"""
     temp_file = None
     output_file = None
     watermark_file = None
+    watermark_image_file = None
     
     try:
         temp_file = await save_upload_file(file)
@@ -599,11 +608,60 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
         width, height = letter
         
         c.saveState()
-        c.setFont("Helvetica", 50)
-        c.setFillColorRGB(0.5, 0.5, 0.5, alpha=0.3)
-        c.translate(width/2, height/2)
-        c.rotate(45)
-        c.drawCentredString(0, 0, text)
+        
+        # Calculate position
+        if position == "center":
+            x_pos, y_pos = width/2, height/2
+        elif position == "top-left":
+            x_pos, y_pos = width*0.25, height*0.75
+        elif position == "top-right":
+            x_pos, y_pos = width*0.75, height*0.75
+        elif position == "bottom-left":
+            x_pos, y_pos = width*0.25, height*0.25
+        elif position == "bottom-right":
+            x_pos, y_pos = width*0.75, height*0.25
+        else:
+            x_pos, y_pos = width/2, height/2
+        
+        c.translate(x_pos, y_pos)
+        c.rotate(rotation)
+        
+        # Check if image watermark is provided
+        if watermark_image and watermark_image.filename:
+            # Save watermark image
+            watermark_image_file = await save_upload_file(watermark_image)
+            
+            # Open and resize image
+            img = Image.open(str(watermark_image_file))
+            
+            # Calculate image dimensions based on size parameter
+            aspect_ratio = img.width / img.height
+            if aspect_ratio > 1:
+                img_width = size * 2
+                img_height = img_width / aspect_ratio
+            else:
+                img_height = size * 2
+                img_width = img_height * aspect_ratio
+            
+            # Set opacity
+            c.setFillAlpha(opacity)
+            
+            # Draw image (centered on the position)
+            c.drawImage(
+                ImageReader(img),
+                -img_width/2, -img_height/2,
+                width=img_width, height=img_height,
+                mask='auto',
+                preserveAspectRatio=True
+            )
+        elif text:
+            # Text watermark
+            c.setFont("Helvetica", size)
+            c.setFillColorRGB(0.5, 0.5, 0.5, alpha=opacity)
+            c.drawCentredString(0, 0, text)
+        else:
+            raise HTTPException(status_code=400, detail="Either text or watermark_image must be provided")
+        
         c.restoreState()
         c.save()
         
@@ -626,11 +684,11 @@ async def watermark_pdf(file: UploadFile = File(...), text: str = Form(...)):
             output_file,
             media_type="application/pdf",
             filename="watermarked.pdf",
-            background=lambda: cleanup_files(temp_file, watermark_file, output_file)
+            background=lambda: cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
         )
     
     except Exception as e:
-        cleanup_files(temp_file, watermark_file, output_file)
+        cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/protect")
@@ -1056,6 +1114,123 @@ async def java_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/add-page-numbers")
+async def add_page_numbers(
+    file: UploadFile = File(...),
+    format: str = Form(...),
+    position: str = Form(...)
+):
+    """Add page numbers to PDF pages"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Read the original PDF
+        pdf_reader = PdfReader(str(temp_file))
+        pdf_writer = PdfWriter()
+        
+        total_pages = len(pdf_reader.pages)
+        
+        # Helper function to convert number to roman numerals
+        def to_roman(num):
+            val = [
+                1000, 900, 500, 400,
+                100, 90, 50, 40,
+                10, 9, 5, 4,
+                1
+            ]
+            syms = [
+                "M", "CM", "D", "CD",
+                "C", "XC", "L", "XL",
+                "X", "IX", "V", "IV",
+                "I"
+            ]
+            roman_num = ''
+            i = 0
+            while num > 0:
+                for _ in range(num // val[i]):
+                    roman_num += syms[i]
+                    num -= val[i]
+                i += 1
+            return roman_num
+        
+        # Process each page
+        for page_num in range(total_pages):
+            # Get the page from original PDF
+            page = pdf_reader.pages[page_num]
+            page_width = float(page.mediabox.width)
+            page_height = float(page.mediabox.height)
+            
+            # Create a new PDF with the page number
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=(page_width, page_height))
+            
+            # Determine page number text based on format
+            page_number = page_num + 1
+            if format == "numeric":
+                page_text = str(page_number)
+            elif format == "numeric-page":
+                page_text = f"Page {page_number}"
+            elif format == "roman-lower":
+                page_text = to_roman(page_number).lower()
+            elif format == "roman-lower-page":
+                page_text = f"Page {to_roman(page_number).lower()}"
+            elif format == "roman-upper":
+                page_text = to_roman(page_number)
+            elif format == "roman-upper-page":
+                page_text = f"Page {to_roman(page_number)}"
+            else:
+                page_text = str(page_number)
+            
+            # Set font and determine position
+            can.setFont("Helvetica", 10)
+            text_width = can.stringWidth(page_text, "Helvetica", 10)
+            
+            # Position the page number (bottom)
+            y_position = 20  # 20 points from bottom
+            
+            if position == "bottom-left":
+                x_position = 40  # 40 points from left
+            elif position == "bottom-center":
+                x_position = (page_width - text_width) / 2
+            elif position == "bottom-right":
+                x_position = page_width - text_width - 40  # 40 points from right
+            else:
+                x_position = (page_width - text_width) / 2  # default to center
+            
+            # Draw the page number
+            can.drawString(x_position, y_position, page_text)
+            can.save()
+            
+            # Move to the beginning of the BytesIO buffer
+            packet.seek(0)
+            
+            # Read the page number overlay
+            overlay_pdf = PdfReader(packet)
+            overlay_page = overlay_pdf.pages[0]
+            
+            # Merge the overlay with the original page
+            page.merge_page(overlay_page)
+            pdf_writer.add_page(page)
+        
+        # Save the output PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_numbered.pdf"
+        with open(output_file, "wb") as f:
+            pdf_writer.write(f)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="numbered.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/python-to-pdf")
 async def python_to_pdf(file: UploadFile = File(...)):
     """Convert Python source code file to PDF with formatted text and line numbers"""
@@ -1186,6 +1361,91 @@ async def xml_to_pdf(file: UploadFile = File(...)):
     except HTTPException:
         cleanup_files(temp_file, output_file)
         raise
+@api_router.post("/preview-pages")
+async def preview_pdf_pages(file: UploadFile = File(...)):
+    """Generate preview images for all pages in PDF"""
+    temp_file = None
+    preview_files = []
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Open PDF with PyMuPDF
+        import fitz
+        pdf_document = fitz.open(str(temp_file))
+        
+        # Generate previews for all pages
+        previews = []
+        for page_num in range(len(pdf_document)):
+            page = pdf_document[page_num]
+            # Render page to image with 150 DPI for better quality
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            
+            # Convert to base64 for JSON response
+            import base64
+            img_bytes = pix.tobytes("png")
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            
+            previews.append({
+                "pageNumber": page_num + 1,
+                "imageData": f"data:image/png;base64,{img_base64}",
+                "width": pix.width,
+                "height": pix.height
+            })
+        
+        pdf_document.close()
+        cleanup_files(temp_file)
+        
+        return JSONResponse(content={
+            "totalPages": len(previews),
+            "pages": previews
+        })
+    
+    except Exception as e:
+        cleanup_files(temp_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/delete-pages")
+async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = Form(...)):
+    """Delete specified pages from PDF"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Parse pages to delete (comma-separated list, e.g., "1,3,5")
+        pages_to_delete_list = [int(p.strip()) - 1 for p in pages_to_delete.split(',') if p.strip()]
+        
+        # Read PDF
+        pdf_reader = PdfReader(str(temp_file))
+        pdf_writer = PdfWriter()
+        
+        # Add all pages except the ones to delete
+        total_pages = len(pdf_reader.pages)
+        for page_num in range(total_pages):
+            if page_num not in pages_to_delete_list:
+                pdf_writer.add_page(pdf_reader.pages[page_num])
+        
+        # Check if all pages were deleted
+        if len(pdf_writer.pages) == 0:
+            raise HTTPException(status_code=400, detail="Cannot delete all pages. At least one page must remain.")
+        
+        # Save modified PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_deleted.pdf"
+        with open(output_file, "wb") as f:
+            pdf_writer.write(f)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename="modified.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except ValueError as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Invalid page numbers format. Use comma-separated numbers (e.g., 1,3,5)")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))

@@ -10,10 +10,18 @@ import {
   AlertCircle,
   Sun,
   Moon,
+  Share2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import axios from "axios";
 
@@ -126,8 +134,13 @@ const toolConfigs = {
     acceptFiles: ".pdf",
     multiple: false,
     hasExtraInput: true,
-    inputLabel: "Watermark Text",
-    inputPlaceholder: "CONFIDENTIAL",
+    hasWatermarkOptions: true,
+    inputLabel: "Watermark Type",
+    inputType: "select",
+    options: [
+      { value: "text", label: "Text Watermark" },
+      { value: "image", label: "Image Watermark (PNG/JPG/JPEG)" },
+    ],
   },
   protect: {
     title: "Protect PDF",
@@ -161,11 +174,40 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "add-page-numbers": {
+    title: "Add Page Numbers",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: true,
+    inputType: "select",
+    inputLabel: "Page Number Format",
+    options: [
+      { value: "numeric", label: "1, 2, 3, 4, ..." },
+      { value: "numeric-page", label: "Page 1, Page 2, Page 3, ..." },
+      { value: "roman-lower", label: "i, ii, iii, iv, ..." },
+      { value: "roman-lower-page", label: "Page i, Page ii, Page iii, ..." },
+      { value: "roman-upper", label: "I, II, III, IV, ..." },
+      { value: "roman-upper-page", label: "Page I, Page II, Page III, ..." },
+    ],
+    inputLabel2: "Page Number Position",
+    options2: [
+      { value: "bottom-left", label: "Bottom Left" },
+      { value: "bottom-center", label: "Bottom Center" },
+      { value: "bottom-right", label: "Bottom Right" },
+    ],
+  },
   "python-to-pdf": {
     title: "Python to PDF",
     acceptFiles: ".py",
     multiple: false,
     hasExtraInput: false,
+  },
+  "delete-pages": {
+    title: "Delete Pages",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: false,
+    hasPageSelection: true,
   },
 };
 
@@ -174,6 +216,12 @@ export default function ToolPage() {
   const navigate = useNavigate();
   const [files, setFiles] = useState([]);
   const [extraInput, setExtraInput] = useState("");
+  const [extraInput2, setExtraInput2] = useState("");
+  const [watermarkImage, setWatermarkImage] = useState(null);
+  const [watermarkText, setWatermarkText] = useState("");
+  const [watermarkOpacity, setWatermarkOpacity] = useState(30);
+  const [watermarkRotation, setWatermarkRotation] = useState(45);
+  const [watermarkSize, setWatermarkSize] = useState(50);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -182,12 +230,48 @@ export default function ToolPage() {
     return savedTheme === "light" ? false : true;
   });
 
+  // States for delete-pages feature
+  const [pdfPages, setPdfPages] = useState([]);
+  const [selectedPages, setSelectedPages] = useState([]);
+  const [loadingPages, setLoadingPages] = useState(false);
+
   // Save theme preference to localStorage
   useEffect(() => {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   const config = toolConfigs[toolId];
+
+  // Function to load PDF page previews
+  const loadPdfPreviews = async file => {
+    console.log("Loading PDF previews for:", file.name);
+    setLoadingPages(true);
+    setPdfPages([]);
+    setSelectedPages([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      console.log("Sending request to:", `${API}/preview-pages`);
+      const response = await axios.post(`${API}/preview-pages`, formData, {
+        timeout: 60000,
+      });
+
+      console.log("Preview response:", response.data);
+      setPdfPages(response.data.pages);
+      toast.success(`Loaded ${response.data.totalPages} pages`);
+    } catch (err) {
+      console.error("Preview error:", err);
+      console.error("Error details:", err.response?.data);
+      toast.error(
+        "Failed to load PDF previews: " +
+          (err.response?.data?.detail || err.message)
+      );
+    } finally {
+      setLoadingPages(false);
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: config?.acceptFiles
@@ -196,9 +280,28 @@ export default function ToolPage() {
     multiple: config?.multiple,
     maxSize: 10 * 1024 * 1024, // 10MB
     onDrop: acceptedFiles => {
+      console.log("Files dropped:", acceptedFiles);
+      console.log("Current toolId:", toolId);
+      console.log("Config hasPageSelection:", config?.hasPageSelection);
+
       setFiles(acceptedFiles);
       setError(null);
       setResult(null);
+      // Set default values for select inputs
+      if (config?.inputType === "select" && config?.options) {
+        setExtraInput(config.options[0].value);
+      }
+      if (config?.options2) {
+        setExtraInput2(config.options2[1].value); // Default to bottom-center
+      }
+
+      // Load page previews for delete-pages tool
+      if (config?.hasPageSelection && acceptedFiles.length > 0) {
+        console.log("Loading page previews...");
+        loadPdfPreviews(acceptedFiles[0]);
+      } else {
+        console.log("Skipping page preview - condition not met");
+      }
     },
     onDropRejected: rejections => {
       const error = rejections[0]?.errors[0];
@@ -221,6 +324,30 @@ export default function ToolPage() {
       return;
     }
 
+    // Special validation for delete-pages
+    if (toolId === "delete-pages") {
+      if (selectedPages.length === 0) {
+        toast.error("Please select at least one page to delete.");
+        return;
+      }
+      if (selectedPages.length === pdfPages.length) {
+        toast.error("Cannot delete all pages. At least one page must remain.");
+        return;
+      }
+    }
+
+    // Special validation for watermark
+    if (toolId === "watermark") {
+      if (extraInput === "text" && !watermarkText) {
+        toast.error("Please provide watermark text.");
+        return;
+      }
+      if (extraInput === "image" && !watermarkImage) {
+        toast.error("Please upload a watermark image.");
+        return;
+      }
+    }
+
     setProcessing(true);
     setError(null);
     setResult(null);
@@ -241,12 +368,32 @@ export default function ToolPage() {
         } else if (toolId === "rotate") {
           formData.append("angle", extraInput);
         } else if (toolId === "watermark") {
-          formData.append("text", extraInput);
+          // Handle watermark options
+          if (extraInput === "text") {
+            formData.append("text", watermarkText);
+          } else if (extraInput === "image" && watermarkImage) {
+            formData.append("watermark_image", watermarkImage);
+          }
+          // Add position (always center), opacity, rotation, and size
+          // Convert 0-100 scale to actual values
+          formData.append("position", "center");
+          formData.append("opacity", watermarkOpacity / 100); // Convert to 0-1
+          formData.append("rotation", (watermarkRotation * 360) / 100); // Convert to 0-360
+          formData.append("size", (watermarkSize * 80) / 100 + 20); // Convert to 20-100
         } else if (toolId === "protect" || toolId === "unlock") {
           formData.append("password", extraInput);
         } else if (toolId === "sign") {
           formData.append("signature_text", extraInput);
+        } else if (toolId === "add-page-numbers") {
+          formData.append("format", extraInput);
+          formData.append("position", extraInput2);
         }
+      }
+
+      // Handle delete-pages
+      if (toolId === "delete-pages") {
+        const pagesToDelete = selectedPages.join(",");
+        formData.append("pages_to_delete", pagesToDelete);
       }
 
       const response = await axios.post(`${API}/${toolId}`, formData, {
@@ -313,11 +460,66 @@ export default function ToolPage() {
     }
   };
 
+  const handleShare = async () => {
+    try {
+      if (!result || !result.url) {
+        toast.error("No file available to share");
+        return;
+      }
+
+      // Check if Web Share API is available
+      if (!navigator.share) {
+        toast.error(
+          "Sharing is not supported on this browser. Please use download instead."
+        );
+        return;
+      }
+
+      // Convert blob URL to actual file
+      const response = await fetch(result.url);
+      const blob = await response.blob();
+      const file = new File([blob], result.filename, { type: blob.type });
+
+      // Check if sharing files is supported
+      if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+        toast.error(
+          "File sharing is not supported on this device. Please use download instead."
+        );
+        return;
+      }
+
+      // Share the file directly without downloading
+      await navigator.share({
+        files: [file],
+        title: "PDF Master",
+        text: `Sharing ${result.filename}`,
+      });
+
+      toast.success("File shared successfully!");
+    } catch (error) {
+      // User cancelled the share
+      if (error.name === "AbortError") {
+        toast.info("Share cancelled");
+      } else {
+        console.error("Share error:", error);
+        toast.error("Failed to share file. Please try download instead.");
+      }
+    }
+  };
+
   const handleReset = () => {
     setFiles([]);
     setExtraInput("");
+    setExtraInput2("");
+    setWatermarkImage(null);
+    setWatermarkText("");
+    setWatermarkOpacity(30);
+    setWatermarkRotation(45);
+    setWatermarkSize(50);
     setResult(null);
     setError(null);
+    setPdfPages([]);
+    setSelectedPages([]);
   };
 
   if (!config) {
@@ -513,26 +715,493 @@ export default function ToolPage() {
 
                 {/* Extra Input */}
                 {config.hasExtraInput && (
+                  <div className="mt-6 space-y-4">
+                    {config.inputType === "select" ? (
+                      <>
+                        <div>
+                          <Label
+                            htmlFor="extra-input"
+                            className={
+                              isDarkMode ? "text-white" : "text-gray-900"
+                            }
+                          >
+                            {config.inputLabel}
+                          </Label>
+                          <Select
+                            value={extraInput}
+                            onValueChange={setExtraInput}
+                          >
+                            <SelectTrigger
+                              className={
+                                isDarkMode
+                                  ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                  : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                              }
+                              data-testid="extra-input"
+                            >
+                              <SelectValue placeholder="Select format" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {config.options?.map(option => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {config.options2 && (
+                          <div>
+                            <Label
+                              htmlFor="extra-input-2"
+                              className={
+                                isDarkMode ? "text-white" : "text-gray-900"
+                              }
+                            >
+                              {config.inputLabel2}
+                            </Label>
+                            <Select
+                              value={extraInput2}
+                              onValueChange={setExtraInput2}
+                            >
+                              <SelectTrigger
+                                className={
+                                  isDarkMode
+                                    ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                    : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                                }
+                                data-testid="extra-input-2"
+                              >
+                                <SelectValue placeholder="Select position" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {config.options2?.map(option => (
+                                  <SelectItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+
+                        {/* Watermark-specific options */}
+                        {config.hasWatermarkOptions && (
+                          <>
+                            {extraInput === "text" && (
+                              <div>
+                                <Label
+                                  htmlFor="watermark-text"
+                                  className={
+                                    isDarkMode ? "text-white" : "text-gray-900"
+                                  }
+                                >
+                                  Watermark Text
+                                </Label>
+                                <Input
+                                  id="watermark-text"
+                                  type="text"
+                                  placeholder="CONFIDENTIAL"
+                                  value={watermarkText}
+                                  onChange={e =>
+                                    setWatermarkText(e.target.value)
+                                  }
+                                  className={
+                                    isDarkMode
+                                      ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                                      : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            {extraInput === "image" && (
+                              <div className="mb-4">
+                                <Label
+                                  htmlFor="watermark-image"
+                                  className={
+                                    isDarkMode
+                                      ? "text-white mb-2 block"
+                                      : "text-gray-900 mb-2 block"
+                                  }
+                                >
+                                  Watermark Image
+                                </Label>
+                                <div className="relative">
+                                  <Input
+                                    id="watermark-image"
+                                    type="file"
+                                    accept=".png,.jpg,.jpeg"
+                                    onChange={e =>
+                                      setWatermarkImage(e.target.files[0])
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white w-full h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
+                                        : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 w-full h-auto py-2 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 file:cursor-pointer"
+                                    }
+                                  />
+                                </div>
+                                {watermarkImage && (
+                                  <p className="text-sm text-green-400 mt-2 flex items-center">
+                                    <span className="mr-2">✓</span>
+                                    <span className="font-medium">
+                                      {watermarkImage.name}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-3 gap-4 mt-6">
+                              {/* Opacity Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Opacity
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkOpacity(
+                                        Math.max(0, watermarkOpacity - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkOpacity}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkOpacity(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkOpacity(
+                                        Math.min(100, watermarkOpacity + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Rotation Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Rotation
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkRotation(
+                                        Math.max(0, watermarkRotation - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkRotation}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkRotation(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkRotation(
+                                        Math.min(100, watermarkRotation + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {/* Size Control */}
+                              <div>
+                                <Label
+                                  className={
+                                    isDarkMode
+                                      ? "text-white text-sm text-center block mb-2"
+                                      : "text-gray-900 text-sm text-center block mb-2"
+                                  }
+                                >
+                                  Size
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkSize(
+                                        Math.max(0, watermarkSize - 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    -
+                                  </Button>
+                                  <Input
+                                    type="text"
+                                    value={watermarkSize}
+                                    onChange={e => {
+                                      const val = e.target.value.replace(
+                                        /[^0-9]/g,
+                                        ""
+                                      );
+                                      const num =
+                                        val === "" ? 0 : parseInt(val);
+                                      setWatermarkSize(
+                                        Math.min(100, Math.max(0, num))
+                                      );
+                                    }}
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 text-center bg-white/5 border-white/10 text-white"
+                                        : "h-9 text-center bg-white border-gray-300 text-gray-900"
+                                    }
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={() =>
+                                      setWatermarkSize(
+                                        Math.min(100, watermarkSize + 10)
+                                      )
+                                    }
+                                    className={
+                                      isDarkMode
+                                        ? "h-9 w-9 p-0 bg-white/5 hover:bg-white/10 border border-white/10 text-white"
+                                        : "h-9 w-9 p-0 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-900"
+                                    }
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <div>
+                        <Label
+                          htmlFor="extra-input"
+                          className={
+                            isDarkMode ? "text-white" : "text-gray-900"
+                          }
+                        >
+                          {config.inputLabel}
+                        </Label>
+                        <Input
+                          id="extra-input"
+                          type={config.inputType || "text"}
+                          placeholder={config.inputPlaceholder}
+                          value={extraInput}
+                          onChange={e => setExtraInput(e.target.value)}
+                          className={
+                            isDarkMode
+                              ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white"
+                              : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900"
+                          }
+                          data-testid="extra-input"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Page Selection for delete-pages */}
+                {config?.hasPageSelection && pdfPages.length > 0 && (
                   <div className="mt-6">
-                    <Label
-                      htmlFor="extra-input"
-                      className={isDarkMode ? "text-white" : "text-gray-900"}
-                    >
-                      {config.inputLabel}
-                    </Label>
-                    <Input
-                      id="extra-input"
-                      type={config.inputType || "text"}
-                      placeholder={config.inputPlaceholder}
-                      value={extraInput}
-                      onChange={e => setExtraInput(e.target.value)}
-                      className={
+                    <div className="flex items-center justify-between mb-4">
+                      <Label
+                        className={isDarkMode ? "text-white" : "text-gray-900"}
+                      >
+                        Select Pages to Delete ({selectedPages.length} selected)
+                      </Label>
+                      <div className="space-x-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setSelectedPages(pdfPages.map(p => p.pageNumber))
+                          }
+                          className={
+                            isDarkMode ? "text-white border-white/10" : ""
+                          }
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedPages([])}
+                          className={
+                            isDarkMode ? "text-white border-white/10" : ""
+                          }
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                    <div
+                      className={`max-h-[400px] overflow-y-auto rounded-xl p-4 ${
                         isDarkMode
-                          ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white"
-                          : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900"
-                      }
-                      data-testid="extra-input"
-                    />
+                          ? "bg-white/5"
+                          : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {pdfPages.map(page => (
+                          <div
+                            key={page.pageNumber}
+                            onClick={() => {
+                              setSelectedPages(prev =>
+                                prev.includes(page.pageNumber)
+                                  ? prev.filter(p => p !== page.pageNumber)
+                                  : [...prev, page.pageNumber]
+                              );
+                            }}
+                            className={`relative cursor-pointer rounded-lg overflow-hidden border-2 transition-all ${
+                              selectedPages.includes(page.pageNumber)
+                                ? "border-red-500 shadow-lg shadow-red-500/25"
+                                : isDarkMode
+                                ? "border-white/10 hover:border-white/30"
+                                : "border-gray-200 hover:border-gray-400"
+                            }`}
+                          >
+                            <img
+                              src={page.imageData}
+                              alt={`Page ${page.pageNumber}`}
+                              className="w-full h-auto"
+                            />
+                            <div
+                              className={`absolute top-2 right-2 w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                selectedPages.includes(page.pageNumber)
+                                  ? "bg-red-500 border-red-500"
+                                  : isDarkMode
+                                  ? "bg-white/10 border-white/30"
+                                  : "bg-white border-gray-300"
+                              }`}
+                            >
+                              {selectedPages.includes(page.pageNumber) && (
+                                <svg
+                                  className="w-4 h-4 text-white"
+                                  fill="currentColor"
+                                  viewBox="0 0 20 20"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              )}
+                            </div>
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 py-2 text-center text-sm font-medium ${
+                                selectedPages.includes(page.pageNumber)
+                                  ? "bg-red-500/90 text-white"
+                                  : isDarkMode
+                                  ? "bg-black/50 text-white"
+                                  : "bg-white/90 text-gray-900"
+                              }`}
+                            >
+                              Page {page.pageNumber}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {loadingPages && (
+                  <div className="mt-6 flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 text-indigo-500 animate-spin mr-3" />
+                    <p
+                      className={isDarkMode ? "text-gray-400" : "text-gray-600"}
+                    >
+                      Loading page previews...
+                    </p>
                   </div>
                 )}
 
@@ -651,6 +1320,16 @@ export default function ToolPage() {
                         <Download className="mr-2 h-5 w-5" />
                         Download File
                       </Button>
+
+                      {/* Native Share Button */}
+                      <Button
+                        onClick={handleShare}
+                        className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-6 rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                      >
+                        <Share2 className="mr-2 h-5 w-5" />
+                        Share File
+                      </Button>
+
                       <Button
                         onClick={handleReset}
                         className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
