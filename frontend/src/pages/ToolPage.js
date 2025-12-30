@@ -196,6 +196,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "xml-to-pdf": {
+    title: "XML to PDF",
+    acceptFiles: ".xml",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "delete-pages": {
     title: "Delete Pages",
     acceptFiles: ".pdf",

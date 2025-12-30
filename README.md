@@ -13,7 +13,7 @@ Access all PDF tools directly in your browser - no installation, no signup requi
 
 ## ✨ Overview
 
-PDF Master is a comprehensive toolkit that provides 17+ professional PDF tools in one place. Whether you need to merge documents, convert formats, compress files, or perform advanced operations like OCR and digital signatures, PDF Master has you covered.
+PDF Master is a comprehensive toolkit that provides 18+ professional PDF tools in one place. Whether you need to merge documents, convert formats, compress files, or perform advanced operations like OCR and digital signatures, PDF Master has you covered.
 
 ## 🚀 Features
 
@@ -32,6 +32,7 @@ PDF Master is a comprehensive toolkit that provides 17+ professional PDF tools i
 - ✅ **Word to PDF** - Convert Word documents to PDF
 - ✅ **PDF to Excel** - Extract tables and data to Excel
 - ✅ **Excel to PDF** - Convert spreadsheets to PDF format
+- ✅ **XML to PDF** - Convert XML files to PDF with formatted structure
 
 ### Advanced Features
 

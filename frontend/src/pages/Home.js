@@ -184,6 +184,13 @@ const tools = [
     color: "from-blue-500 to-indigo-600",
   },
   {
+    id: "xml-to-pdf",
+    name: "XML to PDF",
+    icon: FileCode,
+    description: "Convert XML files to PDF",
+    color: "from-purple-500 to-violet-600",
+  },
+  {
     id: "delete-pages",
     name: "Delete Pages",
     icon: Scissors,

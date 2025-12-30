@@ -34,6 +34,8 @@ import nbformat
 from nbconvert import PDFExporter
 from nbconvert.preprocessors import ExecutePreprocessor
 import subprocess
+import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1298,6 +1300,106 @@ async def python_to_pdf(file: UploadFile = File(...)):
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/xml-to-pdf")
+async def xml_to_pdf(file: UploadFile = File(...)):
+    """Convert XML file to PDF with formatted structure"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.xml'):
+            raise HTTPException(status_code=400, detail="File must be an .xml file")
+        
+        temp_file = await save_upload_file(file)
+        
+        # Read and parse XML file
+        try:
+            tree = ET.parse(str(temp_file))
+            root = tree.getroot()
+            
+            # Pretty print XML for better formatting
+            xml_string = ET.tostring(root, encoding='unicode')
+            dom = minidom.parseString(xml_string)
+            pretty_xml = dom.toprettyxml(indent="  ")
+        except ET.ParseError as e:
+            cleanup_files(temp_file, output_file)
+            raise HTTPException(status_code=400, detail=f"Invalid XML file: {str(e)}")
+        except Exception as e:
+            cleanup_files(temp_file, output_file)
+            raise HTTPException(status_code=400, detail=f"Error parsing XML: {str(e)}")
+        
+        # Create PDF with formatted XML
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_xml.pdf"
+        
+        # Create PDF using SimpleDocTemplate (more reliable than canvas)
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a custom style for XML content
+        code_style = ParagraphStyle(
+            'XMLCode',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        
+        story = []
+        
+        # Add title
+        title_style = ParagraphStyle(
+            'XMLTitle',
+            parent=styles['Heading1'],
+            fontSize=14,
+            spaceAfter=20,
+        )
+        story.append(Paragraph(f"XML File: {file.filename}", title_style))
+        story.append(Spacer(1, 0.2 * inch))
+        
+        # Split XML content into lines and add to PDF
+        lines = pretty_xml.split('\n')
+        
+        for line in lines:
+            # Skip empty lines at the start
+            if not line.strip():
+                line = '&nbsp;'
+                
+            # Escape special characters for reportlab
+            line = line.replace('&', '&amp;')
+            line = line.replace('<', '&lt;')
+            line = line.replace('>', '&gt;')
+            # Preserve spaces
+            line = line.replace(' ', '&nbsp;')
+            line = line.replace('\t', '&nbsp;&nbsp;')
+            
+            story.append(Paragraph(line, code_style))
+        
+        doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read XML file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"XML to PDF error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error converting XML to PDF: {str(e)}")
 
 @api_router.post("/preview-pages")
 async def preview_pdf_pages(file: UploadFile = File(...)):
