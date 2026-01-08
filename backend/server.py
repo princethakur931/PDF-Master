@@ -9,6 +9,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 import uuid
+from urllib.parse import quote
 from datetime import datetime, timezone
 import tempfile
 import shutil
@@ -81,6 +82,55 @@ def cleanup_files(*files):
         except Exception as e:
             logging.error(f"Error cleaning up file {file}: {e}")
 
+# Utility function to generate output filename from input filename
+def get_output_filename(original_filename: str, new_extension: str, suffix: str = "") -> str:
+    """
+    Generate output filename from original filename with new extension.
+    
+    Args:
+        original_filename: The original uploaded filename
+        new_extension: The desired extension (e.g., 'pdf', 'jpg', 'docx')
+        suffix: Optional suffix to add before extension (e.g., '_merged', '_compressed')
+    
+    Returns:
+        Output filename with the new extension
+    """
+    stem = Path(original_filename).stem
+    if suffix:
+        return f"{stem}{suffix}.{new_extension.lstrip('.')}"
+    return f"{stem}.{new_extension.lstrip('.')}"
+
+# Utility function to create FileResponse with properly encoded filename
+def create_file_response(file_path: Path, filename: str, media_type: str, cleanup_callback=None):
+    """
+    Create a FileResponse with properly encoded Content-Disposition header.
+    
+    Args:
+        file_path: Path to the file to send
+        filename: The desired download filename
+        media_type: MIME type of the file
+        cleanup_callback: Optional callback for cleanup
+    
+    Returns:
+        FileResponse with proper headers
+    """
+    # Encode filename for Content-Disposition header
+    # Use simple ASCII-safe encoding to avoid browser issues
+    encoded_filename = quote(filename)
+    
+    response = FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=filename,
+        background=cleanup_callback
+    )
+    
+    # Override Content-Disposition header with both formats for maximum compatibility
+    # This ensures the filename works across all browsers
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{encoded_filename}'
+    
+    return response
+
 @api_router.get("/")
 async def root():
     return {"message": "PDF Master API"}
@@ -111,12 +161,15 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
+        # Use first file's name as base for output
+        output_filename = get_output_filename(files[0].filename, 'pdf', '_merged')
+        
         # Return file
-        return FileResponse(
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="merged.pdf",
-            background=lambda: cleanup_files(*temp_files, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(*temp_files, output_file)
         )
     
     except Exception as e:
@@ -154,11 +207,13 @@ async def split_pdf(file: UploadFile = File(...), pages: str = Form(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'pdf', '_split')
+        
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="split.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -188,11 +243,13 @@ async def compress_pdf(file: UploadFile = File(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'pdf', '_compressed')
+        
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="compressed.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -219,11 +276,13 @@ async def rotate_pdf(file: UploadFile = File(...), angle: int = Form(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'pdf', '_rotated')
+        
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="rotated.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -251,12 +310,9 @@ async def pdf_to_jpg(file: UploadFile = File(...)):
             pix.save(str(output_file))
             output_files.append(output_file)
             
-            return FileResponse(
-                output_file,
-                media_type="image/jpeg",
-                filename="page_1.jpg",
-                background=lambda: cleanup_files(temp_file, output_file)
-            )
+            output_filename = get_output_filename(file.filename, 'jpg')
+            
+            return create_file_response(output_file, output_filename, "image/jpeg", lambda: cleanup_files(temp_file, output_file))
         else:
             # Multiple pages - return first page for now
             page = pdf_document[0]
@@ -264,12 +320,9 @@ async def pdf_to_jpg(file: UploadFile = File(...)):
             output_file = UPLOAD_DIR / f"{uuid.uuid4()}.jpg"
             pix.save(str(output_file))
             
-            return FileResponse(
-                output_file,
-                media_type="image/jpeg",
-                filename="page_1.jpg",
-                background=lambda: cleanup_files(temp_file, output_file)
-            )
+            output_filename = get_output_filename(file.filename, 'jpg')
+            
+            return create_file_response(output_file, output_filename, "image/jpeg", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, *output_files)
@@ -291,11 +344,13 @@ async def pdf_to_png(file: UploadFile = File(...)):
         output_file = UPLOAD_DIR / f"{uuid.uuid4()}.png"
         pix.save(str(output_file))
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'png')
+        
+        return create_file_response(
             output_file,
-            media_type="image/png",
-            filename="page_1.png",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "image/png",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -315,11 +370,13 @@ async def jpg_to_pdf(file: UploadFile = File(...)):
         with open(output_file, "wb") as f:
             f.write(img2pdf.convert(str(temp_file)))
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="converted.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -339,11 +396,13 @@ async def png_to_pdf(file: UploadFile = File(...)):
         with open(output_file, "wb") as f:
             f.write(img2pdf.convert(str(temp_file)))
         
-        return FileResponse(
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(
             output_file,
-            media_type="application/pdf",
-            filename="converted.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
         )
     
     except Exception as e:
@@ -364,12 +423,9 @@ async def pdf_to_word(file: UploadFile = File(...)):
         cv.convert(str(output_file))
         cv.close()
         
-        return FileResponse(
-            output_file,
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            filename="converted.docx",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'docx')
+        
+        return create_file_response(output_file, output_filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -403,12 +459,9 @@ async def word_to_pdf(file: UploadFile = File(...)):
         
         c.save()
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="converted.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -444,12 +497,9 @@ async def excel_to_pdf(file: UploadFile = File(...)):
         
         c.save()
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="converted.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -486,12 +536,9 @@ async def pdf_to_excel(file: UploadFile = File(...)):
         
         wb.save(str(output_file))
         
-        return FileResponse(
-            output_file,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename="converted.xlsx",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'xlsx')
+        
+        return create_file_response(output_file, output_filename, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -544,12 +591,9 @@ async def cpp_to_pdf(file: UploadFile = File(...)):
         
         doc.build(story)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="converted.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -678,12 +722,9 @@ async def watermark_pdf(
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="watermarked.pdf",
-            background=lambda: cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_watermarked')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, watermark_file, watermark_image_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, watermark_file, watermark_image_file, output_file)
@@ -710,12 +751,9 @@ async def protect_pdf(file: UploadFile = File(...), password: str = Form(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="protected.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_protected')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -743,12 +781,9 @@ async def unlock_pdf(file: UploadFile = File(...), password: str = Form(...)):
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="unlocked.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_unlocked')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -790,12 +825,9 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="signed.pdf",
-            background=lambda: cleanup_files(temp_file, signature_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_signed')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, signature_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, signature_file, output_file)
@@ -1027,12 +1059,9 @@ async def ipynb_to_pdf(file: UploadFile = File(...)):
         # Build PDF
         doc.build(story)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="notebook.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except HTTPException:
         cleanup_files(temp_file, output_file)
@@ -1218,12 +1247,9 @@ async def add_page_numbers(
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="numbered.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_numbered')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except Exception as e:
         cleanup_files(temp_file, output_file)
@@ -1374,12 +1400,9 @@ async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = 
         with open(output_file, "wb") as f:
             pdf_writer.write(f)
         
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename="modified.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
+        output_filename = get_output_filename(file.filename, 'pdf', '_modified')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
     except ValueError as e:
         cleanup_files(temp_file, output_file)
@@ -1397,6 +1420,7 @@ app.add_middleware(
     allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["content-disposition"],
 )
 
 # Configure logging
