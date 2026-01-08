@@ -191,6 +191,20 @@ const tools = [
     color: "from-purple-500 to-violet-600",
   },
   {
+    id: "html-to-pdf",
+    name: "HTML to PDF",
+    icon: FileCode,
+    description: "Convert HTML source files to PDF",
+    color: "from-orange-500 to-amber-600",
+  },
+  {
+    id: "css-to-pdf",
+    name: "CSS to PDF",
+    icon: FileCode,
+    description: "Convert CSS source files to PDF",
+    color: "from-blue-400 to-cyan-500",
+  },
+  {
     id: "delete-pages",
     name: "Delete Pages",
     icon: Scissors,
@@ -243,6 +257,8 @@ export default function Home() {
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
       { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
+      { id: "html-to-pdf", name: "HTML to PDF", icon: FileCode },
+      { id: "css-to-pdf", name: "CSS to PDF", icon: FileCode },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },

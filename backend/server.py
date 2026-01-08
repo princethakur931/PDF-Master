@@ -1357,7 +1357,8 @@ async def xml_to_pdf(file: UploadFile = File(...)):
             raise HTTPException(status_code=400, detail=f"Error parsing XML: {str(e)}")
         
         # Create PDF with formatted XML
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_xml.pdf"
+        output_filename = Path(file.filename).stem + ".pdf"
+        output_file = UPLOAD_DIR / output_filename
         
         # Create PDF using SimpleDocTemplate (more reliable than canvas)
         doc = SimpleDocTemplate(str(output_file), pagesize=letter)
@@ -1416,6 +1417,158 @@ async def xml_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         logging.error(f"XML to PDF error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error converting XML to PDF: {str(e)}")
+
+@api_router.post("/html-to-pdf")
+async def html_to_pdf(file: UploadFile = File(...)):
+    """Convert HTML source code file to PDF with formatted structure"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith(('.html', '.htm')):
+            raise HTTPException(status_code=400, detail="File must be an .html or .htm file")
+        
+        temp_file = await save_upload_file(file)
+        
+        # Read HTML file
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            html_code = f.read()
+        
+        # Create PDF with formatted HTML
+        output_filename = Path(file.filename).stem + ".pdf"
+        output_file = UPLOAD_DIR / output_filename
+        
+        # Create PDF using SimpleDocTemplate
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a custom style for HTML code
+        code_style = ParagraphStyle(
+            'HTMLCode',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        
+        story = []
+        
+        # Split HTML content into lines and add to PDF
+        lines = html_code.split('\n')
+        
+        for line in lines:
+            # Handle empty lines
+            if not line.strip():
+                line = '&nbsp;'
+            else:
+                # Escape special characters for reportlab
+                line = line.replace('&', '&amp;')
+                line = line.replace('<', '&lt;')
+                line = line.replace('>', '&gt;')
+                # Preserve spaces and indentation
+                line = line.replace(' ', '&nbsp;')
+                line = line.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
+            
+            story.append(Paragraph(line, code_style))
+        
+        doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read HTML file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"HTML to PDF error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error converting HTML to PDF: {str(e)}")
+
+@api_router.post("/css-to-pdf")
+async def css_to_pdf(file: UploadFile = File(...)):
+    """Convert CSS source code file to PDF with formatted structure"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.css'):
+            raise HTTPException(status_code=400, detail="File must be a .css file")
+        
+        temp_file = await save_upload_file(file)
+        
+        # Read CSS file
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            css_code = f.read()
+        
+        # Create PDF with formatted CSS
+        output_filename = Path(file.filename).stem + ".pdf"
+        output_file = UPLOAD_DIR / output_filename
+        
+        # Create PDF using SimpleDocTemplate
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a custom style for CSS code
+        code_style = ParagraphStyle(
+            'CSSCode',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        
+        story = []
+        
+        # Split CSS content into lines and add to PDF
+        lines = css_code.split('\n')
+        
+        for line in lines:
+            # Handle empty lines
+            if not line.strip():
+                line = '&nbsp;'
+            else:
+                # Escape special characters for reportlab
+                line = line.replace('&', '&amp;')
+                line = line.replace('<', '&lt;')
+                line = line.replace('>', '&gt;')
+                # Preserve spaces and indentation
+                line = line.replace(' ', '&nbsp;')
+                line = line.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
+            
+            story.append(Paragraph(line, code_style))
+        
+        doc.build(story)
+        
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read CSS file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"CSS to PDF error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error converting CSS to PDF: {str(e)}")
 
 @api_router.post("/preview-pages")
 async def preview_pdf_pages(file: UploadFile = File(...)):
