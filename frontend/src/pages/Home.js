@@ -242,6 +242,7 @@ export default function Home() {
       { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
+      { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },
