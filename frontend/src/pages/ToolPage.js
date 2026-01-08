@@ -408,14 +408,38 @@ export default function ToolPage() {
         const blob = new Blob([response.data]);
         const url = window.URL.createObjectURL(blob);
 
-        // Determine output file extension based on conversion direction
-        let extension = "pdf";
-        if (toolId === "pdf-to-jpg") extension = "jpg";
-        else if (toolId === "pdf-to-png") extension = "png";
-        else if (toolId === "pdf-to-word") extension = "docx";
-        else if (toolId === "pdf-to-excel") extension = "xlsx";
+        // Extract filename from Content-Disposition header
+        let filename = "output.pdf";
 
-        setResult({ type: "file", url, filename: `output.${extension}` });
+        // Debug: Log all headers
+        console.log("Response headers:", response.headers);
+        console.log(
+          "Content-Disposition:",
+          response.headers["content-disposition"]
+        );
+
+        const contentDisposition = response.headers["content-disposition"];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(
+            /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+          );
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, "");
+            console.log("Extracted filename:", filename);
+          }
+        } else {
+          console.warn("No content-disposition header found, using fallback");
+          // Fallback: determine output file extension based on conversion direction
+          let extension = "pdf";
+          if (toolId === "pdf-to-jpg") extension = "jpg";
+          else if (toolId === "pdf-to-png") extension = "png";
+          else if (toolId === "pdf-to-word") extension = "docx";
+          else if (toolId === "pdf-to-excel") extension = "xlsx";
+          filename = `output.${extension}`;
+        }
+
+        console.log("Final filename:", filename);
+        setResult({ type: "file", url, filename });
         toast.success("Processing complete!");
       }
     } catch (err) {
