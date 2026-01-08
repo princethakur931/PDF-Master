@@ -1353,16 +1353,6 @@ async def xml_to_pdf(file: UploadFile = File(...)):
         
         story = []
         
-        # Add title
-        title_style = ParagraphStyle(
-            'XMLTitle',
-            parent=styles['Heading1'],
-            fontSize=14,
-            spaceAfter=20,
-        )
-        story.append(Paragraph(f"XML File: {file.filename}", title_style))
-        story.append(Spacer(1, 0.2 * inch))
-        
         # Split XML content into lines and add to PDF
         lines = pretty_xml.split('\n')
         
