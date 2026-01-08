@@ -208,6 +208,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "css-to-pdf": {
+    title: "CSS to PDF",
+    acceptFiles: ".css",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "delete-pages": {
     title: "Delete Pages",
     acceptFiles: ".pdf",
