@@ -601,6 +601,61 @@ async def cpp_to_pdf(file: UploadFile = File(...)):
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/c-to-pdf")
+async def c_to_pdf(file: UploadFile = File(...)):
+    """Convert C source code to PDF with syntax highlighting"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        
+        # Read the C source code
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            c_code = f.read()
+        
+        # Create PDF with syntax highlighting
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Create a custom style for code
+        code_style = ParagraphStyle(
+            'Code',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        
+        story = []
+        
+        # Split code into lines and add to PDF
+        lines = c_code.split('\n')
+        for line in lines:
+            # Escape special characters for reportlab
+            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Preserve spaces
+            line = line.replace(' ', '&nbsp;')
+            if not line.strip():
+                line = '&nbsp;'
+            story.append(Paragraph(line, code_style))
+        
+        doc.build(story)
+        
+        output_filename = get_output_filename(file.filename, 'pdf')
+        
+        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
+    
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/ocr")
 async def ocr_pdf(file: UploadFile = File(...)):
     """Extract text from PDF using OCR"""
