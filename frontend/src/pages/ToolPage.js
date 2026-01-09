@@ -129,6 +129,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "ts-to-pdf": {
+    title: "TypeScript to PDF",
+    acceptFiles: ".ts,.tsx",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
     acceptFiles: ".ipynb",
