@@ -128,6 +128,13 @@ const tools = [
     color: "from-gray-600 to-slate-700",
   },
   {
+    id: "js-to-pdf",
+    name: "JavaScript to PDF",
+    icon: FileCode,
+    description: "Convert JavaScript code to PDF",
+    color: "from-yellow-500 to-orange-500",
+  },
+  {
     id: "ipynb-to-pdf",
     name: "Notebook to PDF",
     icon: FileText,
@@ -242,6 +249,7 @@ export default function Home() {
       { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "c-to-pdf", name: "C to PDF", icon: FileCode },
+      { id: "js-to-pdf", name: "JavaScript to PDF", icon: FileCode },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
     ],
     convertFromPdf: [
