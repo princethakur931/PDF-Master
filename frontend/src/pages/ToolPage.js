@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
   Share2,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -245,6 +246,13 @@ const toolConfigs = {
     hasExtraInput: false,
     hasPageSelection: true,
   },
+  reorder: {
+    title: "Reorder Pages",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: false,
+    hasPageReorder: true,
+  },
 };
 
 export default function ToolPage() {
@@ -270,6 +278,10 @@ export default function ToolPage() {
   const [pdfPages, setPdfPages] = useState([]);
   const [selectedPages, setSelectedPages] = useState([]);
   const [loadingPages, setLoadingPages] = useState(false);
+
+  // States for reorder-pages feature
+  const [reorderPages, setReorderPages] = useState([]);
+  const [draggedPage, setDraggedPage] = useState(null);
 
   // Save theme preference to localStorage
   useEffect(() => {
@@ -309,6 +321,38 @@ export default function ToolPage() {
     }
   };
 
+  // Function to load PDF pages for reordering
+  const loadPdfForReorder = async file => {
+    console.log("Loading PDF for reordering:", file.name);
+    setLoadingPages(true);
+    setReorderPages([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(`${API}/pdf-pages-info`, formData, {
+        timeout: 60000,
+      });
+
+      console.log("Pages info response:", response.data);
+      const pages = response.data.pages.map(page => ({
+        ...page,
+        id: `page-${page.page_number}`,
+      }));
+      setReorderPages(pages);
+      toast.success(`Loaded ${response.data.total_pages} pages`);
+    } catch (err) {
+      console.error("Pages info error:", err);
+      toast.error(
+        "Failed to load PDF pages: " +
+          (err.response?.data?.detail || err.message)
+      );
+    } finally {
+      setLoadingPages(false);
+    }
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: config?.acceptFiles
       .split(",")
@@ -335,6 +379,9 @@ export default function ToolPage() {
       if (config?.hasPageSelection && acceptedFiles.length > 0) {
         console.log("Loading page previews...");
         loadPdfPreviews(acceptedFiles[0]);
+      } else if (config?.hasPageReorder && acceptedFiles.length > 0) {
+        console.log("Loading pages for reordering...");
+        loadPdfForReorder(acceptedFiles[0]);
       } else {
         console.log("Skipping page preview - condition not met");
       }
@@ -368,6 +415,14 @@ export default function ToolPage() {
       }
       if (selectedPages.length === pdfPages.length) {
         toast.error("Cannot delete all pages. At least one page must remain.");
+        return;
+      }
+    }
+
+    // Special validation for reorder
+    if (toolId === "reorder") {
+      if (reorderPages.length === 0) {
+        toast.error("Please upload a PDF file first.");
         return;
       }
     }
@@ -430,6 +485,12 @@ export default function ToolPage() {
       if (toolId === "delete-pages") {
         const pagesToDelete = selectedPages.join(",");
         formData.append("pages_to_delete", pagesToDelete);
+      }
+
+      // Handle reorder
+      if (toolId === "reorder") {
+        const pageOrder = reorderPages.map(p => p.page_number).join(",");
+        formData.append("page_order", pageOrder);
       }
 
       const response = await axios.post(`${API}/${toolId}`, formData, {
@@ -561,6 +622,8 @@ export default function ToolPage() {
     setError(null);
     setPdfPages([]);
     setSelectedPages([]);
+    setReorderPages([]);
+    setDraggedPage(null);
   };
 
   if (!config) {
@@ -1231,6 +1294,130 @@ export default function ToolPage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Page Reordering for reorder tool */}
+                {config?.hasPageReorder && reorderPages.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <Label
+                        className={isDarkMode ? "text-white" : "text-gray-900"}
+                      >
+                        Drag to Reorder Pages ({reorderPages.length} pages)
+                      </Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const reversed = [...reorderPages].reverse();
+                          setReorderPages(reversed);
+                          toast.success("Pages reversed");
+                        }}
+                        className={
+                          isDarkMode ? "text-white border-white/10" : ""
+                        }
+                      >
+                        Reverse Order
+                      </Button>
+                    </div>
+                    <div
+                      className={`max-h-[500px] overflow-y-auto rounded-xl p-4 ${
+                        isDarkMode
+                          ? "bg-white/5"
+                          : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {reorderPages.map((page, index) => (
+                          <div
+                            key={page.id}
+                            draggable
+                            onDragStart={() => setDraggedPage(index)}
+                            onDragOver={e => {
+                              e.preventDefault();
+                            }}
+                            onDrop={e => {
+                              e.preventDefault();
+                              if (draggedPage === null) return;
+
+                              const newPages = [...reorderPages];
+                              const draggedItem = newPages[draggedPage];
+                              newPages.splice(draggedPage, 1);
+                              newPages.splice(index, 0, draggedItem);
+                              setReorderPages(newPages);
+                              setDraggedPage(null);
+                            }}
+                            onDragEnd={() => setDraggedPage(null)}
+                            className={`relative cursor-move rounded-lg overflow-hidden border-2 transition-all ${
+                              draggedPage === index
+                                ? "opacity-50 scale-95"
+                                : "opacity-100 scale-100"
+                            } ${
+                              isDarkMode
+                                ? "border-white/20 hover:border-violet-400 hover:shadow-lg hover:shadow-violet-500/25"
+                                : "border-gray-200 hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/25"
+                            }`}
+                          >
+                            <div className="w-full aspect-[3/4] bg-white">
+                              {page.imageData ? (
+                                <img
+                                  src={page.imageData}
+                                  alt={`Page ${page.page_number}`}
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <div
+                                  className={`w-full h-full flex items-center justify-center ${
+                                    isDarkMode
+                                      ? "bg-gradient-to-br from-gray-800 to-gray-900"
+                                      : "bg-gradient-to-br from-gray-100 to-gray-200"
+                                  }`}
+                                >
+                                  <div className="text-center">
+                                    <FileText
+                                      className={`w-16 h-16 mx-auto mb-2 ${
+                                        isDarkMode ? "text-white/40" : "text-gray-400"
+                                      }`}
+                                    />
+                                    <p
+                                      className={`text-sm ${
+                                        isDarkMode ? "text-white/60" : "text-gray-500"
+                                      }`}
+                                    >
+                                      Original Page {page.page_number}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 py-2 text-center text-sm font-medium ${
+                                isDarkMode
+                                  ? "bg-black/50 text-white"
+                                  : "bg-white/90 text-gray-900"
+                              }`}
+                            >
+                              Page {page.page_number}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div
+                      className={`mt-4 p-4 rounded-lg ${
+                        isDarkMode ? "bg-violet-500/10" : "bg-violet-50"
+                      }`}
+                    >
+                      <p
+                        className={`text-sm ${
+                          isDarkMode ? "text-violet-200" : "text-violet-900"
+                        }`}
+                      >
+                        💡 <strong>Tip:</strong> Drag and drop pages to rearrange them.
+                      </p>
                     </div>
                   </div>
                 )}

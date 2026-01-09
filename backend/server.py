@@ -1834,6 +1834,119 @@ async def preview_pdf_pages(file: UploadFile = File(...)):
         cleanup_files(temp_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/pdf-pages-info")
+async def get_pdf_pages_info(file: UploadFile = File(...)):
+    """Get information about PDF pages including page count and thumbnails"""
+    temp_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Open PDF with PyMuPDF to generate previews
+        import fitz
+        import base64
+        
+        pdf_document = fitz.open(str(temp_file))
+        total_pages = len(pdf_document)
+        
+        # Generate previews for all pages
+        pages = []
+        for page_num in range(total_pages):
+            page = pdf_document[page_num]
+            # Render page to image with 1.5x scaling for better quality
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+            
+            # Convert to base64 for JSON response
+            img_bytes = pix.tobytes("png")
+            img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+            
+            pages.append({
+                "page_number": page_num + 1,
+                "imageData": f"data:image/png;base64,{img_base64}",
+                "width": pix.width,
+                "height": pix.height
+            })
+        
+        pdf_document.close()
+        cleanup_files(temp_file)
+        
+        # Return page information
+        pages_info = {
+            "total_pages": total_pages,
+            "pages": pages
+        }
+        
+        return JSONResponse(content=pages_info)
+    
+    except Exception as e:
+        cleanup_files(temp_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/reorder")
+async def reorder_pdf_pages(file: UploadFile = File(...), page_order: str = Form(...)):
+    """Reorder PDF pages based on the provided order"""
+    temp_file = None
+    output_file = None
+    
+    try:
+        temp_file = await save_upload_file(file)
+        
+        # Parse page order (comma-separated list, e.g., "3,1,2,4")
+        # The page_order should contain all page numbers in the new order
+        page_order_list = [int(p.strip()) - 1 for p in page_order.split(',') if p.strip()]
+        
+        # Read PDF
+        pdf_reader = PdfReader(str(temp_file))
+        total_pages = len(pdf_reader.pages)
+        
+        # Validate page order
+        if len(page_order_list) != total_pages:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Page order must contain all {total_pages} pages. Received {len(page_order_list)} pages."
+            )
+        
+        # Check for duplicate pages
+        if len(set(page_order_list)) != len(page_order_list):
+            raise HTTPException(status_code=400, detail="Page order contains duplicate page numbers")
+        
+        # Check for invalid page numbers
+        for page_num in page_order_list:
+            if page_num < 0 or page_num >= total_pages:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid page number {page_num + 1}. Must be between 1 and {total_pages}"
+                )
+        
+        # Create new PDF with reordered pages
+        pdf_writer = PdfWriter()
+        for page_num in page_order_list:
+            pdf_writer.add_page(pdf_reader.pages[page_num])
+        
+        # Save reordered PDF
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_reordered.pdf"
+        with open(output_file, "wb") as f:
+            pdf_writer.write(f)
+        
+        output_filename = get_output_filename(file.filename, 'pdf', '_reordered')
+        
+        return create_file_response(
+            output_file,
+            output_filename,
+            "application/pdf",
+            lambda: cleanup_files(temp_file, output_file)
+        )
+    
+    except ValueError as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Invalid page order format. Use comma-separated numbers (e.g., 3,1,2,4)")
+    except HTTPException:
+        cleanup_files(temp_file, output_file)
+        raise
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/delete-pages")
 async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = Form(...)):
     """Delete specified pages from PDF"""

@@ -239,6 +239,13 @@ const tools = [
     description: "Remove specific pages from PDF",
     color: "from-red-500 to-rose-600",
   },
+  {
+    id: "reorder",
+    name: "Reorder Pages",
+    icon: RotateCw,
+    description: "Shuffle and rearrange PDF pages",
+    color: "from-violet-500 to-purple-600",
+  },
 ];
 
 export default function Home() {
