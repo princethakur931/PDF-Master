@@ -123,6 +123,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "php-to-pdf": {
+    title: "PHP to PDF",
+    acceptFiles: ".php",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
     acceptFiles: ".ipynb",
