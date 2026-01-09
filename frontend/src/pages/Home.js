@@ -259,6 +259,7 @@ export default function Home() {
       { id: "split", name: "Split PDF", icon: Scissors },
       { id: "compress", name: "Compress PDF", icon: Minimize2 },
       { id: "rotate", name: "Rotate PDF", icon: RotateCw },
+      { id: "reorder", name: "Reorder Pages", icon: RotateCw },
       { id: "delete-pages", name: "Delete Pages", icon: Scissors },
     ],
     convertToPdf: [
