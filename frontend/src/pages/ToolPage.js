@@ -111,6 +111,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "c-to-pdf": {
+    title: "C to PDF",
+    acceptFiles: ".c,.h",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
     acceptFiles: ".ipynb",
