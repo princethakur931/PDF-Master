@@ -135,6 +135,13 @@ const tools = [
     color: "from-yellow-500 to-orange-500",
   },
   {
+    id: "php-to-pdf",
+    name: "PHP to PDF",
+    icon: FileCode,
+    description: "Convert PHP source code to PDF",
+    color: "from-indigo-600 to-purple-600",
+  },
+  {
     id: "ipynb-to-pdf",
     name: "Notebook to PDF",
     icon: FileText,
@@ -271,6 +278,7 @@ export default function Home() {
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
       { id: "c-to-pdf", name: "C to PDF", icon: FileCode },
       { id: "js-to-pdf", name: "JavaScript to PDF", icon: FileCode },
+      { id: "php-to-pdf", name: "PHP to PDF", icon: FileCode },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
       { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
       { id: "html-to-pdf", name: "HTML to PDF", icon: FileCode },
