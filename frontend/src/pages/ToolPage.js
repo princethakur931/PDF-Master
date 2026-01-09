@@ -1292,14 +1292,15 @@ export default function ToolPage() {
                       <Button
                         type="button"
                         size="sm"
-                        variant="outline"
                         onClick={() => {
                           const reversed = [...reorderPages].reverse();
                           setReorderPages(reversed);
                           toast.success("Pages reversed");
                         }}
                         className={
-                          isDarkMode ? "text-white border-white/10" : ""
+                          isDarkMode
+                            ? "bg-violet-600 hover:bg-violet-700 text-white"
+                            : "bg-violet-600 hover:bg-violet-700 text-white"
                         }
                       >
                         Reverse Order
