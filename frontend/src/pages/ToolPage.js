@@ -1379,12 +1379,16 @@ export default function ToolPage() {
                                   <div className="text-center">
                                     <FileText
                                       className={`w-16 h-16 mx-auto mb-2 ${
-                                        isDarkMode ? "text-white/40" : "text-gray-400"
+                                        isDarkMode
+                                          ? "text-white/40"
+                                          : "text-gray-400"
                                       }`}
                                     />
                                     <p
                                       className={`text-sm ${
-                                        isDarkMode ? "text-white/60" : "text-gray-500"
+                                        isDarkMode
+                                          ? "text-white/60"
+                                          : "text-gray-500"
                                       }`}
                                     >
                                       Original Page {page.page_number}
@@ -1416,7 +1420,8 @@ export default function ToolPage() {
                           isDarkMode ? "text-violet-200" : "text-violet-900"
                         }`}
                       >
-                        💡 <strong>Tip:</strong> Drag and drop pages to rearrange them.
+                        💡 <strong>Tip:</strong> Drag and drop pages to
+                        rearrange them.
                       </p>
                     </div>
                   </div>
