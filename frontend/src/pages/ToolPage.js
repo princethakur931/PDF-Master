@@ -117,6 +117,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "js-to-pdf": {
+    title: "JavaScript to PDF",
+    acceptFiles: ".js,.jsx,.mjs,.cjs",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
     acceptFiles: ".ipynb",
