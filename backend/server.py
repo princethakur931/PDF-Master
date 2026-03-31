@@ -137,6 +137,11 @@ def create_file_response(file_path: Path, filename: str, media_type: str, cleanu
 async def root():
     return {"message": "PDF Master API"}
 
+@api_router.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring services like UptimeRobot"""
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
 @api_router.post("/merge")
 async def merge_pdfs(files: List[UploadFile] = File(...)):
     """Merge multiple PDF files into one"""
@@ -1988,6 +1993,12 @@ async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = 
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
+
+# Health check endpoint at root level
+@app.get("/health")
+async def root_health_check():
+    """Root level health check endpoint for UptimeRobot monitoring"""
+    return {"status": "ok", "service": "PDF Master API", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 # Include the router in the main app
 app.include_router(api_router)
