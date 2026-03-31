@@ -137,7 +137,7 @@ def create_file_response(file_path: Path, filename: str, media_type: str, cleanu
 async def root():
     return {"message": "PDF Master API"}
 
-@api_router.get("/health")
+@api_router.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     """Health check endpoint for monitoring services like UptimeRobot"""
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
@@ -1995,7 +1995,7 @@ async def delete_pdf_pages(file: UploadFile = File(...), pages_to_delete: str = 
         raise HTTPException(status_code=500, detail=str(e))
 
 # Health check endpoint at root level
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def root_health_check():
     """Root level health check endpoint for UptimeRobot monitoring"""
     return {"status": "ok", "service": "PDF Master API", "timestamp": datetime.now(timezone.utc).isoformat()}
