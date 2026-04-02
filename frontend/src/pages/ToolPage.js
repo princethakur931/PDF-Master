@@ -111,30 +111,36 @@ const toolConfigs = {
     acceptFiles: ".cpp,.cc,.cxx,.h,.hpp",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "c-to-pdf": {
     title: "C to PDF",
     acceptFiles: ".c,.h",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
+
   },
   "js-to-pdf": {
     title: "JavaScript to PDF",
     acceptFiles: ".js,.jsx,.mjs,.cjs",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "php-to-pdf": {
     title: "PHP to PDF",
     acceptFiles: ".php",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "ts-to-pdf": {
     title: "TypeScript to PDF",
     acceptFiles: ".ts,.tsx",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
@@ -192,6 +198,7 @@ const toolConfigs = {
     acceptFiles: ".java",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "add-page-numbers": {
     title: "Add Page Numbers",
@@ -220,24 +227,28 @@ const toolConfigs = {
     acceptFiles: ".py",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "xml-to-pdf": {
     title: "XML to PDF",
     acceptFiles: ".xml",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "html-to-pdf": {
     title: "HTML to PDF",
     acceptFiles: ".html,.htm",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "css-to-pdf": {
     title: "CSS to PDF",
     acceptFiles: ".css",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "delete-pages": {
     title: "Delete Pages",
@@ -261,6 +272,7 @@ export default function ToolPage() {
   const [files, setFiles] = useState([]);
   const [extraInput, setExtraInput] = useState("");
   const [extraInput2, setExtraInput2] = useState("");
+  const [colorMode, setColorMode] = useState("bw");
   const [watermarkImage, setWatermarkImage] = useState(null);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkOpacity, setWatermarkOpacity] = useState(30);
@@ -450,6 +462,10 @@ export default function ToolPage() {
         files.forEach(file => formData.append("files", file));
       } else {
         formData.append("file", files[0]);
+        // Add color mode for code-to-pdf tools
+        if (config?.hasColorMode) {
+          formData.append("color_mode", colorMode);
+        }
       }
 
       // Add extra input based on tool
@@ -624,6 +640,7 @@ export default function ToolPage() {
     setSelectedPages([]);
     setReorderPages([]);
     setDraggedPage(null);
+    setColorMode("bw");
   };
 
   if (!config) {
@@ -1439,6 +1456,42 @@ export default function ToolPage() {
                   </div>
                 )}
 
+                {/* Color Mode Toggle */}
+                {config?.hasColorMode && (
+                  <div className="mt-6">
+                    <Label className={isDarkMode ? "text-white mb-2 block" : "text-gray-900 mb-2 block"}>
+                      Text Color Mode
+                    </Label>
+                    <div className="flex gap-3 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setColorMode("bw")}
+                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all duration-200 ${
+                          colorMode === "bw"
+                            ? "border-indigo-500 bg-indigo-500/10 text-indigo-400"
+                            : isDarkMode
+                            ? "border-white/10 text-gray-400 hover:border-white/30"
+                            : "border-gray-300 text-gray-600 hover:border-gray-400"
+                        }`}
+                      >
+                        ⬛ Black & White
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setColorMode("colorful")}
+                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all duration-200 ${
+                          colorMode === "colorful"
+                            ? "border-purple-500 bg-purple-500/10 text-purple-400"
+                            : isDarkMode
+                            ? "border-white/10 text-gray-400 hover:border-white/30"
+                            : "border-gray-300 text-gray-600 hover:border-gray-400"
+                        }`}
+                      >
+                        🎨 Colorful Text
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* Process Button */}
                 <Button
                   onClick={handleProcess}
