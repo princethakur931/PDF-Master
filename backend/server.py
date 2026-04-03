@@ -974,7 +974,7 @@ async def sign_pdf(file: UploadFile = File(...), signature_text: str = Form(...)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/ipynb-to-pdf")
-async def ipynb_to_pdf(file: UploadFile = File(...)):
+async def ipynb_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
     """Convert Jupyter Notebook (.ipynb) to PDF"""
     temp_file = None
     output_file = None
@@ -1016,7 +1016,7 @@ async def ipynb_to_pdf(file: UploadFile = File(...)):
             parent=styles['Normal'],
             fontSize=8,
             leading=10,
-            textColor=colors.HexColor('#0066cc'),
+            textColor=colors.HexColor('#0066cc')  if color_mode == "colorful" else colors.black,
             fontName='Courier',
         )
         
@@ -1100,6 +1100,7 @@ async def ipynb_to_pdf(file: UploadFile = File(...)):
                     spaceBefore=2,
                     spaceAfter=2,
                     wordWrap='CJK',
+                    textColor=colors.HexColor('#1565c0') if color_mode == "colorful" else colors.black,
                 )
                 
                 input_data = [[Paragraph(input_label, input_style), Preformatted(code_text, small_code_style)]]

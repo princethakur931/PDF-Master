@@ -147,6 +147,7 @@ const toolConfigs = {
     acceptFiles: ".ipynb",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   ocr: {
     title: "OCR PDF",
