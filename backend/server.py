@@ -29,6 +29,7 @@ from pygments.lexers import CppLexer, PythonLexer
 from pygments.formatters import HtmlFormatter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.units import inch
 import nbformat
@@ -133,6 +134,79 @@ def create_file_response(file_path: Path, filename: str, media_type: str, cleanu
     
     return response
 
+def build_code_pdf(code_text: str, output_path: Path, color_mode: str = "bw"):
+    """Render source code to PDF. color_mode: 'bw' or 'colorful'"""
+    from reportlab.lib import colors
+
+    KEYWORDS_BLUE = {
+        'def', 'class', 'import', 'from', 'return', 'if', 'else', 'elif',
+        'for', 'while', 'try', 'except', 'with', 'as', 'in', 'not', 'and',
+        'or', 'True', 'False', 'None', 'int', 'float', 'str', 'bool',
+        'public', 'private', 'protected', 'static', 'void', 'new', 'this',
+        'super', 'extends', 'implements', 'interface', 'abstract',
+        'const', 'let', 'var', 'function', 'async', 'await', 'typeof',
+        '#include', '#define', '#ifndef', '#endif', '#pragma',
+        'struct', 'typedef', 'enum', 'namespace', 'using', 'template',
+        'echo', 'print', 'foreach', 'switch', 'case', 'break', 'continue',
+        'package', 'throws', 'throw', 'final', 'synchronized',
+        'lambda', 'yield', 'pass', 'del', 'global', 'nonlocal',
+        'raise', 'assert'
+    }
+
+    def colorize_line(line: str):
+        if color_mode != "colorful":
+            return colors.black
+        stripped = line.strip()
+        if not stripped:
+            return colors.black
+        if (stripped.startswith('//') or stripped.startswith('#')
+                or stripped.startswith('*') or stripped.startswith('/*')
+                or stripped.startswith('*/')):
+            return HexColor('#2e7d32')   # green for comments
+        if '"' in stripped or "'" in stripped:
+            return HexColor('#b5490a')   # orange for strings
+        first_token = stripped.split()[0].rstrip('(;:{') if stripped.split() else ''
+        if first_token in KEYWORDS_BLUE:
+            return HexColor('#1565c0')   # blue for keywords
+        if stripped[0].isdigit():
+            return HexColor('#7b1fa2')   # purple for numbers
+        return colors.black
+
+    doc = SimpleDocTemplate(
+        str(output_path), pagesize=letter,
+        leftMargin=50, rightMargin=50,
+        topMargin=50, bottomMargin=50
+    )
+    styles = getSampleStyleSheet()
+    story = []
+
+    for line in code_text.split('\n'):
+        text_color = colorize_line(line)
+        safe = (line
+                .replace('&', '&amp;')
+                .replace('<', '&lt;')
+                .replace('>', '&gt;')
+                .replace(' ', '&nbsp;')
+                .replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;'))
+        if not safe.strip():
+            safe = '&nbsp;'
+
+        line_style = ParagraphStyle(
+            'CodeLine',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            alignment=TA_LEFT,
+            textColor=text_color,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+        story.append(Paragraph(safe, line_style))
+
+    doc.build(story)
+
+    
 @api_router.get("/")
 async def root():
     return {"message": "PDF Master API"}
@@ -552,276 +626,115 @@ async def pdf_to_excel(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/cpp-to-pdf")
-async def cpp_to_pdf(file: UploadFile = File(...)):
-    """Convert CPP source code to PDF with syntax highlighting"""
+async def cpp_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert C++ source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
-        
-        # Read the C++ source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            cpp_code = f.read()
-        
-        # Create PDF with syntax highlighting
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for code
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split code into lines and add to PDF
-        lines = cpp_code.split('\n')
-        for line in lines:
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            if not line.strip():
-                line = '&nbsp;'
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
         output_filename = get_output_filename(file.filename, 'pdf')
-        
-        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
-    
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
-
 @api_router.post("/c-to-pdf")
-async def c_to_pdf(file: UploadFile = File(...)):
-    """Convert C source code to PDF with syntax highlighting"""
+async def c_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert C source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
-        
-        # Read the C source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            c_code = f.read()
-        
-        # Create PDF with syntax highlighting
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for code
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split code into lines and add to PDF
-        lines = c_code.split('\n')
-        for line in lines:
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            if not line.strip():
-                line = '&nbsp;'
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
         output_filename = get_output_filename(file.filename, 'pdf')
-        
-        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
-    
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/js-to-pdf")
-async def js_to_pdf(file: UploadFile = File(...)):
-    """Convert JavaScript source code to PDF with syntax highlighting"""
+async def js_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert JavaScript source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
-        
-        # Read the JavaScript source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            js_code = f.read()
-        
-        # Create PDF with syntax highlighting
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for code
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split code into lines and add to PDF
-        lines = js_code.split('\n')
-        for line in lines:
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            if not line.strip():
-                line = '&nbsp;'
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
         output_filename = get_output_filename(file.filename, 'pdf')
-        
-        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
-    
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/php-to-pdf")
-async def php_to_pdf(file: UploadFile = File(...)):
-    """Convert PHP source code to PDF with syntax highlighting"""
+async def php_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert PHP source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
-        
-        # Read the PHP source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            php_code = f.read()
-        
-        # Create PDF with syntax highlighting
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for code
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split code into lines and add to PDF
-        lines = php_code.split('\n')
-        for line in lines:
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            if not line.strip():
-                line = '&nbsp;'
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
         output_filename = get_output_filename(file.filename, 'pdf')
-        
-        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
-    
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/ts-to-pdf")
-async def ts_to_pdf(file: UploadFile = File(...)):
-    """Convert TypeScript source code to PDF with syntax highlighting"""
+async def ts_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert TypeScript source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
-        
-        # Read the TypeScript source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            ts_code = f.read()
-        
-        # Create PDF with syntax highlighting
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for code
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split code into lines and add to PDF
-        lines = ts_code.split('\n')
-        for line in lines:
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            if not line.strip():
-                line = '&nbsp;'
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
         output_filename = get_output_filename(file.filename, 'pdf')
-        
-        return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
-    
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1299,71 +1212,26 @@ async def ipynb_to_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to convert notebook to PDF: {str(e)}")
 
 @api_router.post("/java-to-pdf")
-async def java_to_pdf(file: UploadFile = File(...)):
-    """Convert Java source code file to PDF with formatted text and line numbers"""
+async def java_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert Java source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
-        # Validate file extension
         if not file.filename.lower().endswith('.java'):
             raise HTTPException(status_code=400, detail="File must be a .java file")
-        
         temp_file = await save_upload_file(file)
-        
-        # Read Java source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            java_code = f.read()
-        
-        # Create PDF with formatted code
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_java.pdf"
-        
-        # Create PDF using ReportLab
-        c = canvas.Canvas(str(output_file), pagesize=letter)
-        width, height = letter
-        
-        # Set up fonts and layout
-        margin = 50
-        y_position = height - margin
-        line_height = 12
-        font_size = 9
-        
-        # Set font for code
-        c.setFont("Courier", font_size)
-        
-        # Split code into lines and write to PDF
-        lines = java_code.split('\n')
-        
-        for i, line in enumerate(lines, 1):
-            # Check if we need a new page
-            if y_position < margin + 20:
-                c.showPage()
-                y_position = height - margin
-                c.setFont("Courier", font_size)
-            
-            # Draw code line (truncate if too long)
-            c.setFillColorRGB(0, 0, 0)
-            max_chars = 100
-            if len(line) > max_chars:
-                display_line = line[:max_chars] + "..."
-            else:
-                display_line = line
-            c.drawString(margin, y_position, display_line)
-            
-            y_position -= line_height
-        
-        c.save()
-        
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read Java file. Please ensure it's a valid text file with UTF-8 encoding.")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1483,317 +1351,111 @@ async def add_page_numbers(
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/python-to-pdf")
-async def python_to_pdf(file: UploadFile = File(...)):
-    """Convert Python source code file to PDF with formatted text and line numbers"""
+async def python_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert Python source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
-        # Validate file extension
         if not file.filename.lower().endswith('.py'):
             raise HTTPException(status_code=400, detail="File must be a .py file")
-        
         temp_file = await save_upload_file(file)
-        
-        # Read Python source code
         with open(temp_file, 'r', encoding='utf-8') as f:
-            python_code = f.read()
-        
-        # Create PDF with formatted code
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}_python.pdf"
-        
-        # Create PDF using ReportLab
-        c = canvas.Canvas(str(output_file), pagesize=letter)
-        width, height = letter
-        
-        # Set up fonts and layout
-        margin = 50
-        y_position = height - margin
-        line_height = 12
-        font_size = 9
-        
-        # Set font for code
-        c.setFont("Courier", font_size)
-        
-        # Split code into lines and write to PDF
-        lines = python_code.split('\n')
-        
-        for line in lines:
-            # Check if we need a new page
-            if y_position < margin + 20:
-                c.showPage()
-                y_position = height - margin
-                c.setFont("Courier", font_size)
-            
-            # Draw code line (truncate if too long)
-            c.setFillColorRGB(0, 0, 0)
-            max_chars = 100
-            if len(line) > max_chars:
-                display_line = line[:max_chars] + "..."
-            else:
-                display_line = line
-            c.drawString(margin, y_position, display_line)
-            
-            y_position -= line_height
-        
-        c.save()
-        
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read Python file. Please ensure it's a valid text file with UTF-8 encoding.")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/xml-to-pdf")
-async def xml_to_pdf(file: UploadFile = File(...)):
-    """Convert XML file to PDF with formatted structure"""
+async def xml_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert XML file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
-        # Validate file extension
         if not file.filename.lower().endswith('.xml'):
             raise HTTPException(status_code=400, detail="File must be an .xml file")
-        
         temp_file = await save_upload_file(file)
-        
-        # Read and parse XML file
         try:
             tree = ET.parse(str(temp_file))
             root = tree.getroot()
-            
-            # Pretty print XML for better formatting
             xml_string = ET.tostring(root, encoding='unicode')
             dom = minidom.parseString(xml_string)
-            pretty_xml = dom.toprettyxml(indent="  ")
+            code = dom.toprettyxml(indent="  ")
         except ET.ParseError as e:
-            cleanup_files(temp_file, output_file)
+            cleanup_files(temp_file)
             raise HTTPException(status_code=400, detail=f"Invalid XML file: {str(e)}")
-        except Exception as e:
-            cleanup_files(temp_file, output_file)
-            raise HTTPException(status_code=400, detail=f"Error parsing XML: {str(e)}")
-        
-        # Create PDF with formatted XML
-        output_filename = Path(file.filename).stem + ".pdf"
-        output_file = UPLOAD_DIR / output_filename
-        
-        # Create PDF using SimpleDocTemplate (more reliable than canvas)
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for XML content
-        code_style = ParagraphStyle(
-            'XMLCode',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split XML content into lines and add to PDF
-        lines = pretty_xml.split('\n')
-        
-        for line in lines:
-            # Skip empty lines at the start
-            if not line.strip():
-                line = '&nbsp;'
-                
-            # Escape special characters for reportlab
-            line = line.replace('&', '&amp;')
-            line = line.replace('<', '&lt;')
-            line = line.replace('>', '&gt;')
-            # Preserve spaces
-            line = line.replace(' ', '&nbsp;')
-            line = line.replace('\t', '&nbsp;&nbsp;')
-            
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
     except HTTPException:
-        # Re-raise HTTP exceptions
         raise
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read XML file. Please ensure it's a valid text file with UTF-8 encoding.")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
-        logging.error(f"XML to PDF error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error converting XML to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/html-to-pdf")
-async def html_to_pdf(file: UploadFile = File(...)):
-    """Convert HTML source code file to PDF with formatted structure"""
+async def html_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert HTML source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
-        # Validate file extension
         if not file.filename.lower().endswith(('.html', '.htm')):
             raise HTTPException(status_code=400, detail="File must be an .html or .htm file")
-        
         temp_file = await save_upload_file(file)
-        
-        # Read HTML file
         with open(temp_file, 'r', encoding='utf-8') as f:
-            html_code = f.read()
-        
-        # Create PDF with formatted HTML
-        output_filename = Path(file.filename).stem + ".pdf"
-        output_file = UPLOAD_DIR / output_filename
-        
-        # Create PDF using SimpleDocTemplate
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for HTML code
-        code_style = ParagraphStyle(
-            'HTMLCode',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split HTML content into lines and add to PDF
-        lines = html_code.split('\n')
-        
-        for line in lines:
-            # Handle empty lines
-            if not line.strip():
-                line = '&nbsp;'
-            else:
-                # Escape special characters for reportlab
-                line = line.replace('&', '&amp;')
-                line = line.replace('<', '&lt;')
-                line = line.replace('>', '&gt;')
-                # Preserve spaces and indentation
-                line = line.replace(' ', '&nbsp;')
-                line = line.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
-            
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read HTML file. Please ensure it's a valid text file with UTF-8 encoding.")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
-        logging.error(f"HTML to PDF error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error converting HTML to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/css-to-pdf")
-async def css_to_pdf(file: UploadFile = File(...)):
-    """Convert CSS source code file to PDF with formatted structure"""
+async def css_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert CSS source code file to PDF"""
     temp_file = None
     output_file = None
-    
     try:
-        # Validate file extension
         if not file.filename.lower().endswith('.css'):
             raise HTTPException(status_code=400, detail="File must be a .css file")
-        
         temp_file = await save_upload_file(file)
-        
-        # Read CSS file
         with open(temp_file, 'r', encoding='utf-8') as f:
-            css_code = f.read()
-        
-        # Create PDF with formatted CSS
-        output_filename = Path(file.filename).stem + ".pdf"
-        output_file = UPLOAD_DIR / output_filename
-        
-        # Create PDF using SimpleDocTemplate
-        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
-        styles = getSampleStyleSheet()
-        
-        # Create a custom style for CSS code
-        code_style = ParagraphStyle(
-            'CSSCode',
-            parent=styles['Code'],
-            fontName='Courier',
-            fontSize=9,
-            leading=11,
-            leftIndent=0,
-            rightIndent=0,
-            alignment=TA_LEFT,
-            spaceBefore=0,
-            spaceAfter=0,
-        )
-        
-        story = []
-        
-        # Split CSS content into lines and add to PDF
-        lines = css_code.split('\n')
-        
-        for line in lines:
-            # Handle empty lines
-            if not line.strip():
-                line = '&nbsp;'
-            else:
-                # Escape special characters for reportlab
-                line = line.replace('&', '&amp;')
-                line = line.replace('<', '&lt;')
-                line = line.replace('>', '&gt;')
-                # Preserve spaces and indentation
-                line = line.replace(' ', '&nbsp;')
-                line = line.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
-            
-            story.append(Paragraph(line, code_style))
-        
-        doc.build(story)
-        
-        return FileResponse(
-            output_file,
-            media_type="application/pdf",
-            filename=f"{Path(file.filename).stem}.pdf",
-            background=lambda: cleanup_files(temp_file, output_file)
-        )
-    
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
     except UnicodeDecodeError:
         cleanup_files(temp_file, output_file)
-        raise HTTPException(status_code=400, detail="Unable to read CSS file. Please ensure it's a valid text file with UTF-8 encoding.")
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
     except Exception as e:
         cleanup_files(temp_file, output_file)
-        logging.error(f"CSS to PDF error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error converting CSS to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.post("/preview-pages")
 async def preview_pdf_pages(file: UploadFile = File(...)):
@@ -2023,3 +1685,7 @@ logger = logging.getLogger(__name__)
 async def shutdown_db_client():
     if client:
         client.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
