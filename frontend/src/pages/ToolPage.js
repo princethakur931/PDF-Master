@@ -1456,40 +1456,25 @@ export default function ToolPage() {
                   </div>
                 )}
 
-                {/* Color Mode Toggle */}
+                {/* Color Mode Dropdown */}
                 {config?.hasColorMode && (
                   <div className="mt-6">
                     <Label className={isDarkMode ? "text-white mb-2 block" : "text-gray-900 mb-2 block"}>
                       Text Color Mode
                     </Label>
-                    <div className="flex gap-3 mt-2">
-                      <button
-                        type="button"
-                        onClick={() => setColorMode("bw")}
-                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all duration-200 ${
-                          colorMode === "bw"
-                            ? "border-indigo-500 bg-indigo-500/10 text-indigo-400"
-                            : isDarkMode
-                            ? "border-white/10 text-gray-400 hover:border-white/30"
-                            : "border-gray-300 text-gray-600 hover:border-gray-400"
-                        }`}
-                      >
-                        ⬛ Black & White
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setColorMode("colorful")}
-                        className={`flex-1 py-3 rounded-xl border-2 font-medium transition-all duration-200 ${
-                          colorMode === "colorful"
-                            ? "border-purple-500 bg-purple-500/10 text-purple-400"
-                            : isDarkMode
-                            ? "border-white/10 text-gray-400 hover:border-white/30"
-                            : "border-gray-300 text-gray-600 hover:border-gray-400"
-                        }`}
-                      >
-                        🎨 Colorful Text
-                      </button>
-                    </div>
+                    <Select value={colorMode} onValueChange={setColorMode}>
+                      <SelectTrigger className={
+                        isDarkMode
+                          ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                          : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                      }>
+                        <SelectValue placeholder="Select color mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bw">⬛ Black & White</SelectItem>
+                        <SelectItem value="colorful">🎨 Colorful Text</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
                 {/* Process Button */}
