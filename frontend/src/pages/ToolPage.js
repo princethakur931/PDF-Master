@@ -214,6 +214,12 @@ const toolConfigs = {
     multiple: false,
     hasExtraInput: false,
   },
+  "sql-to-pdf": {
+    title: "SQL to PDF",
+    acceptFiles: ".sql",
+    multiple: false,
+    hasExtraInput: false,
+  },
   "delete-pages": {
     title: "Delete Pages",
     acceptFiles: ".pdf",

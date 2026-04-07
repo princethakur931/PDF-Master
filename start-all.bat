@@ -3,7 +3,7 @@ echo Starting PDF Master Application...
 echo.
 
 echo Starting Backend Server...
-start "Backend Server" cmd /k "cd backend && D:\pdf-master\.venv\Scripts\python.exe -m uvicorn server:app --reload --host 0.0.0.0 --port 8000"
+start "Backend Server" cmd /k "cd backend && if exist .venv\Scripts\python.exe (.venv\Scripts\python.exe -m uvicorn server:app --reload --host 0.0.0.0 --port 8000) else (python -m uvicorn server:app --reload --host 0.0.0.0 --port 8000)"
 
 timeout /t 3 /nobreak >nul
 
