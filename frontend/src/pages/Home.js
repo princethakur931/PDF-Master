@@ -121,6 +121,34 @@ const tools = [
     color: "from-slate-500 to-gray-600",
   },
   {
+    id: "c-to-pdf",
+    name: "C to PDF",
+    icon: FileCode,
+    description: "Convert C source code to PDF",
+    color: "from-gray-600 to-slate-700",
+  },
+  {
+    id: "js-to-pdf",
+    name: "JavaScript to PDF",
+    icon: FileCode,
+    description: "Convert JavaScript code to PDF",
+    color: "from-yellow-500 to-orange-500",
+  },
+  {
+    id: "php-to-pdf",
+    name: "PHP to PDF",
+    icon: FileCode,
+    description: "Convert PHP source code to PDF",
+    color: "from-indigo-600 to-purple-600",
+  },
+  {
+    id: "ts-to-pdf",
+    name: "TypeScript to PDF",
+    icon: FileCode,
+    description: "Convert TypeScript code to PDF",
+    color: "from-blue-600 to-cyan-600",
+  },
+  {
     id: "ipynb-to-pdf",
     name: "Notebook to PDF",
     icon: FileText,
@@ -218,6 +246,13 @@ const tools = [
     description: "Remove specific pages from PDF",
     color: "from-red-500 to-rose-600",
   },
+  {
+    id: "reorder",
+    name: "Reorder Pages",
+    icon: RotateCw,
+    description: "Shuffle and rearrange PDF pages",
+    color: "from-violet-500 to-purple-600",
+  },
 ];
 
 export default function Home() {
@@ -252,6 +287,7 @@ export default function Home() {
       { id: "split", name: "Split PDF", icon: Scissors },
       { id: "compress", name: "Compress PDF", icon: Minimize2 },
       { id: "rotate", name: "Rotate PDF", icon: RotateCw },
+      { id: "reorder", name: "Reorder Pages", icon: RotateCw },
       { id: "delete-pages", name: "Delete Pages", icon: Scissors },
     ],
     convertToPdf: [
@@ -262,6 +298,10 @@ export default function Home() {
       { id: "java-to-pdf", name: "Java to PDF", icon: FileCode },
       { id: "python-to-pdf", name: "Python to PDF", icon: FileCode },
       { id: "cpp-to-pdf", name: "CPP to PDF", icon: FileText },
+      { id: "c-to-pdf", name: "C to PDF", icon: FileCode },
+      { id: "js-to-pdf", name: "JavaScript to PDF", icon: FileCode },
+      { id: "php-to-pdf", name: "PHP to PDF", icon: FileCode },
+      { id: "ts-to-pdf", name: "TypeScript to PDF", icon: FileCode },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
       { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
       { id: "html-to-pdf", name: "HTML to PDF", icon: FileCode },

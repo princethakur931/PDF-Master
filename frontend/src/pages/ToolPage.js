@@ -11,6 +11,7 @@ import {
   Sun,
   Moon,
   Share2,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,12 +111,43 @@ const toolConfigs = {
     acceptFiles: ".cpp,.cc,.cxx,.h,.hpp",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
+  },
+  "c-to-pdf": {
+    title: "C to PDF",
+    acceptFiles: ".c,.h",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
+
+  },
+  "js-to-pdf": {
+    title: "JavaScript to PDF",
+    acceptFiles: ".js,.jsx,.mjs,.cjs",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
+  },
+  "php-to-pdf": {
+    title: "PHP to PDF",
+    acceptFiles: ".php",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
+  },
+  "ts-to-pdf": {
+    title: "TypeScript to PDF",
+    acceptFiles: ".ts,.tsx",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
   },
   "ipynb-to-pdf": {
     title: "Jupyter Notebook to PDF",
     acceptFiles: ".ipynb",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   ocr: {
     title: "OCR PDF",
@@ -167,6 +199,7 @@ const toolConfigs = {
     acceptFiles: ".java",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "add-page-numbers": {
     title: "Add Page Numbers",
@@ -195,24 +228,28 @@ const toolConfigs = {
     acceptFiles: ".py",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "xml-to-pdf": {
     title: "XML to PDF",
     acceptFiles: ".xml",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "html-to-pdf": {
     title: "HTML to PDF",
     acceptFiles: ".html,.htm",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "css-to-pdf": {
     title: "CSS to PDF",
     acceptFiles: ".css",
     multiple: false,
     hasExtraInput: false,
+    hasColorMode: true,
   },
   "sql-to-pdf": {
     title: "SQL to PDF",
@@ -227,6 +264,13 @@ const toolConfigs = {
     hasExtraInput: false,
     hasPageSelection: true,
   },
+  reorder: {
+    title: "Reorder Pages",
+    acceptFiles: ".pdf",
+    multiple: false,
+    hasExtraInput: false,
+    hasPageReorder: true,
+  },
 };
 
 export default function ToolPage() {
@@ -235,6 +279,7 @@ export default function ToolPage() {
   const [files, setFiles] = useState([]);
   const [extraInput, setExtraInput] = useState("");
   const [extraInput2, setExtraInput2] = useState("");
+  const [colorMode, setColorMode] = useState("bw");
   const [watermarkImage, setWatermarkImage] = useState(null);
   const [watermarkText, setWatermarkText] = useState("");
   const [watermarkOpacity, setWatermarkOpacity] = useState(30);
@@ -252,6 +297,10 @@ export default function ToolPage() {
   const [pdfPages, setPdfPages] = useState([]);
   const [selectedPages, setSelectedPages] = useState([]);
   const [loadingPages, setLoadingPages] = useState(false);
+
+  // States for reorder-pages feature
+  const [reorderPages, setReorderPages] = useState([]);
+  const [draggedPage, setDraggedPage] = useState(null);
 
   // Save theme preference to localStorage
   useEffect(() => {
@@ -291,6 +340,38 @@ export default function ToolPage() {
     }
   };
 
+  // Function to load PDF pages for reordering
+  const loadPdfForReorder = async file => {
+    console.log("Loading PDF for reordering:", file.name);
+    setLoadingPages(true);
+    setReorderPages([]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(`${API}/pdf-pages-info`, formData, {
+        timeout: 60000,
+      });
+
+      console.log("Pages info response:", response.data);
+      const pages = response.data.pages.map(page => ({
+        ...page,
+        id: `page-${page.page_number}`,
+      }));
+      setReorderPages(pages);
+      toast.success(`Loaded ${response.data.total_pages} pages`);
+    } catch (err) {
+      console.error("Pages info error:", err);
+      toast.error(
+        "Failed to load PDF pages: " +
+          (err.response?.data?.detail || err.message)
+      );
+    } finally {
+      setLoadingPages(false);
+    }
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: config?.acceptFiles
       .split(",")
@@ -317,6 +398,9 @@ export default function ToolPage() {
       if (config?.hasPageSelection && acceptedFiles.length > 0) {
         console.log("Loading page previews...");
         loadPdfPreviews(acceptedFiles[0]);
+      } else if (config?.hasPageReorder && acceptedFiles.length > 0) {
+        console.log("Loading pages for reordering...");
+        loadPdfForReorder(acceptedFiles[0]);
       } else {
         console.log("Skipping page preview - condition not met");
       }
@@ -354,6 +438,14 @@ export default function ToolPage() {
       }
     }
 
+    // Special validation for reorder
+    if (toolId === "reorder") {
+      if (reorderPages.length === 0) {
+        toast.error("Please upload a PDF file first.");
+        return;
+      }
+    }
+
     // Special validation for watermark
     if (toolId === "watermark") {
       if (extraInput === "text" && !watermarkText) {
@@ -377,6 +469,10 @@ export default function ToolPage() {
         files.forEach(file => formData.append("files", file));
       } else {
         formData.append("file", files[0]);
+        // Add color mode for code-to-pdf tools
+        if (config?.hasColorMode) {
+          formData.append("color_mode", colorMode);
+        }
       }
 
       // Add extra input based on tool
@@ -414,6 +510,12 @@ export default function ToolPage() {
         formData.append("pages_to_delete", pagesToDelete);
       }
 
+      // Handle reorder
+      if (toolId === "reorder") {
+        const pageOrder = reorderPages.map(p => p.page_number).join(",");
+        formData.append("page_order", pageOrder);
+      }
+
       const response = await axios.post(`${API}/${toolId}`, formData, {
         responseType: toolId === "ocr" ? "json" : "blob",
         timeout: 60000,
@@ -426,14 +528,38 @@ export default function ToolPage() {
         const blob = new Blob([response.data]);
         const url = window.URL.createObjectURL(blob);
 
-        // Determine output file extension based on conversion direction
-        let extension = "pdf";
-        if (toolId === "pdf-to-jpg") extension = "jpg";
-        else if (toolId === "pdf-to-png") extension = "png";
-        else if (toolId === "pdf-to-word") extension = "docx";
-        else if (toolId === "pdf-to-excel") extension = "xlsx";
+        // Extract filename from Content-Disposition header
+        let filename = "output.pdf";
 
-        setResult({ type: "file", url, filename: `output.${extension}` });
+        // Debug: Log all headers
+        console.log("Response headers:", response.headers);
+        console.log(
+          "Content-Disposition:",
+          response.headers["content-disposition"]
+        );
+
+        const contentDisposition = response.headers["content-disposition"];
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(
+            /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/
+          );
+          if (filenameMatch && filenameMatch[1]) {
+            filename = filenameMatch[1].replace(/['"]/g, "");
+            console.log("Extracted filename:", filename);
+          }
+        } else {
+          console.warn("No content-disposition header found, using fallback");
+          // Fallback: determine output file extension based on conversion direction
+          let extension = "pdf";
+          if (toolId === "pdf-to-jpg") extension = "jpg";
+          else if (toolId === "pdf-to-png") extension = "png";
+          else if (toolId === "pdf-to-word") extension = "docx";
+          else if (toolId === "pdf-to-excel") extension = "xlsx";
+          filename = `output.${extension}`;
+        }
+
+        console.log("Final filename:", filename);
+        setResult({ type: "file", url, filename });
         toast.success("Processing complete!");
       }
     } catch (err) {
@@ -519,6 +645,9 @@ export default function ToolPage() {
     setError(null);
     setPdfPages([]);
     setSelectedPages([]);
+    setReorderPages([]);
+    setDraggedPage(null);
+    setColorMode("bw");
   };
 
   if (!config) {
@@ -1193,6 +1322,136 @@ export default function ToolPage() {
                   </div>
                 )}
 
+                {/* Page Reordering for reorder tool */}
+                {config?.hasPageReorder && reorderPages.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <Label
+                        className={isDarkMode ? "text-white" : "text-gray-900"}
+                      >
+                        Drag to Reorder Pages ({reorderPages.length} pages)
+                      </Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          const reversed = [...reorderPages].reverse();
+                          setReorderPages(reversed);
+                          toast.success("Pages reversed");
+                        }}
+                        className={
+                          isDarkMode
+                            ? "bg-violet-600 hover:bg-violet-700 text-white"
+                            : "bg-violet-600 hover:bg-violet-700 text-white"
+                        }
+                      >
+                        Reverse Order
+                      </Button>
+                    </div>
+                    <div
+                      className={`max-h-[500px] overflow-y-auto rounded-xl p-4 ${
+                        isDarkMode
+                          ? "bg-white/5"
+                          : "bg-gray-50 border border-gray-200"
+                      }`}
+                    >
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {reorderPages.map((page, index) => (
+                          <div
+                            key={page.id}
+                            draggable
+                            onDragStart={() => setDraggedPage(index)}
+                            onDragOver={e => {
+                              e.preventDefault();
+                            }}
+                            onDrop={e => {
+                              e.preventDefault();
+                              if (draggedPage === null) return;
+
+                              const newPages = [...reorderPages];
+                              const draggedItem = newPages[draggedPage];
+                              newPages.splice(draggedPage, 1);
+                              newPages.splice(index, 0, draggedItem);
+                              setReorderPages(newPages);
+                              setDraggedPage(null);
+                            }}
+                            onDragEnd={() => setDraggedPage(null)}
+                            className={`relative cursor-move rounded-lg overflow-hidden border-2 transition-all ${
+                              draggedPage === index
+                                ? "opacity-50 scale-95"
+                                : "opacity-100 scale-100"
+                            } ${
+                              isDarkMode
+                                ? "border-white/20 hover:border-violet-400 hover:shadow-lg hover:shadow-violet-500/25"
+                                : "border-gray-200 hover:border-violet-500 hover:shadow-lg hover:shadow-violet-500/25"
+                            }`}
+                          >
+                            <div className="w-full aspect-[3/4] bg-white">
+                              {page.imageData ? (
+                                <img
+                                  src={page.imageData}
+                                  alt={`Page ${page.page_number}`}
+                                  className="w-full h-full object-contain"
+                                />
+                              ) : (
+                                <div
+                                  className={`w-full h-full flex items-center justify-center ${
+                                    isDarkMode
+                                      ? "bg-gradient-to-br from-gray-800 to-gray-900"
+                                      : "bg-gradient-to-br from-gray-100 to-gray-200"
+                                  }`}
+                                >
+                                  <div className="text-center">
+                                    <FileText
+                                      className={`w-16 h-16 mx-auto mb-2 ${
+                                        isDarkMode
+                                          ? "text-white/40"
+                                          : "text-gray-400"
+                                      }`}
+                                    />
+                                    <p
+                                      className={`text-sm ${
+                                        isDarkMode
+                                          ? "text-white/60"
+                                          : "text-gray-500"
+                                      }`}
+                                    >
+                                      Original Page {page.page_number}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div
+                              className={`absolute bottom-0 left-0 right-0 py-2 text-center text-sm font-medium ${
+                                isDarkMode
+                                  ? "bg-black/50 text-white"
+                                  : "bg-white/90 text-gray-900"
+                              }`}
+                            >
+                              Page {page.page_number}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div
+                      className={`mt-4 p-4 rounded-lg ${
+                        isDarkMode ? "bg-violet-500/10" : "bg-violet-50"
+                      }`}
+                    >
+                      <p
+                        className={`text-sm ${
+                          isDarkMode ? "text-violet-200" : "text-violet-900"
+                        }`}
+                      >
+                        💡 <strong>Tip:</strong> Drag and drop pages to
+                        rearrange them.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {loadingPages && (
                   <div className="mt-6 flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 text-indigo-500 animate-spin mr-3" />
@@ -1204,6 +1463,27 @@ export default function ToolPage() {
                   </div>
                 )}
 
+                {/* Color Mode Dropdown */}
+                {config?.hasColorMode && (
+                  <div className="mt-6">
+                    <Label className={isDarkMode ? "text-white mb-2 block" : "text-gray-900 mb-2 block"}>
+                      Text Color Mode
+                    </Label>
+                    <Select value={colorMode} onValueChange={setColorMode}>
+                      <SelectTrigger className={
+                        isDarkMode
+                          ? "bg-white/5 border-white/10 focus:border-indigo-500 text-white mt-2"
+                          : "bg-white border-gray-300 focus:border-indigo-500 text-gray-900 mt-2"
+                      }>
+                        <SelectValue placeholder="Select color mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bw">⬛ Black & White</SelectItem>
+                        <SelectItem value="colorful">🎨 Colorful Text</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {/* Process Button */}
                 <Button
                   onClick={handleProcess}
