@@ -233,6 +233,13 @@ const tools = [
     color: "from-blue-400 to-cyan-500",
   },
   {
+    id: "sql-to-pdf",
+    name: "SQL to PDF",
+    icon: FileCode,
+    description: "Convert SQL source files to PDF",
+    color: "from-emerald-500 to-teal-600",
+  },
+  {
     id: "delete-pages",
     name: "Delete Pages",
     icon: Scissors,
@@ -299,6 +306,7 @@ export default function Home() {
       { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },
       { id: "html-to-pdf", name: "HTML to PDF", icon: FileCode },
       { id: "css-to-pdf", name: "CSS to PDF", icon: FileCode },
+      { id: "sql-to-pdf", name: "SQL to PDF", icon: FileCode },
     ],
     convertFromPdf: [
       { id: "pdf-to-jpg", name: "PDF to JPG", icon: ImageIcon },

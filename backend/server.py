@@ -1458,6 +1458,82 @@ async def css_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw"))
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/sql-to-pdf")
+async def sql_to_pdf(file: UploadFile = File(...)):
+    """Convert SQL source code file to PDF with formatted structure"""
+    temp_file = None
+    output_file = None
+
+    try:
+        # Validate file extension
+        if not file.filename.lower().endswith('.sql'):
+            raise HTTPException(status_code=400, detail="File must be a .sql file")
+
+        temp_file = await save_upload_file(file)
+
+        # Read SQL file
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            sql_code = f.read()
+
+        # Create PDF with formatted SQL
+        output_filename = Path(file.filename).stem + ".pdf"
+        output_file = UPLOAD_DIR / output_filename
+
+        # Create PDF using SimpleDocTemplate
+        doc = SimpleDocTemplate(str(output_file), pagesize=letter)
+        styles = getSampleStyleSheet()
+
+        # Create a custom style for SQL code
+        code_style = ParagraphStyle(
+            'SQLCode',
+            parent=styles['Code'],
+            fontName='Courier',
+            fontSize=9,
+            leading=11,
+            leftIndent=0,
+            rightIndent=0,
+            alignment=TA_LEFT,
+            spaceBefore=0,
+            spaceAfter=0,
+        )
+
+        story = []
+
+        # Split SQL content into lines and add to PDF
+        lines = sql_code.split('\n')
+
+        for line in lines:
+            # Handle empty lines
+            if not line.strip():
+                line = '&nbsp;'
+            else:
+                # Escape special characters for reportlab
+                line = line.replace('&', '&amp;')
+                line = line.replace('<', '&lt;')
+                line = line.replace('>', '&gt;')
+                # Preserve spaces and indentation
+                line = line.replace(' ', '&nbsp;')
+                line = line.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
+
+            story.append(Paragraph(line, code_style))
+
+        doc.build(story)
+
+        return FileResponse(
+            output_file,
+            media_type="application/pdf",
+            filename=f"{Path(file.filename).stem}.pdf",
+            background=lambda: cleanup_files(temp_file, output_file)
+        )
+
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="Unable to read SQL file. Please ensure it's a valid text file with UTF-8 encoding.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        logging.error(f"SQL to PDF error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error converting SQL to PDF: {str(e)}")
+
 @api_router.post("/preview-pages")
 async def preview_pdf_pages(file: UploadFile = File(...)):
     """Generate preview images for all pages in PDF"""
