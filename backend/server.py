@@ -16,22 +16,12 @@ import shutil
 from pypdf import PdfReader, PdfWriter
 from PIL import Image
 import img2pdf
-from pdf2docx import Converter
 import io
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
 import openpyxl
-from docx import Document
 import pytesseract
 from pygments import highlight
 from pygments.lexers import CppLexer, PythonLexer
 from pygments.formatters import HtmlFormatter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.units import inch
 import nbformat
 from nbconvert import PDFExporter
 from nbconvert.preprocessors import ExecutePreprocessor
@@ -498,16 +488,35 @@ async def pdf_to_word(file: UploadFile = File(...)):
     
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.docx"
+        temp_dir = temp_file.parent
+        output_stem = Path(temp_file).stem
         
-        cv = Converter(str(temp_file))
-        cv.convert(str(output_file))
-        cv.close()
+        # Use LibreOffice headless to convert PDF to DOCX
+        subprocess.run([
+            'libreoffice',
+            '--headless',
+            '--norestore',
+            '--convert-to', 'docx',
+            '--outdir', str(temp_dir),
+            str(temp_file)
+        ], check=True, capture_output=True, timeout=120)
+        
+        # LibreOffice creates output with same name as input
+        output_file = temp_dir / f"{output_stem}.docx"
+        
+        if not output_file.exists():
+            raise HTTPException(status_code=500, detail="LibreOffice conversion failed: output file not created")
         
         output_filename = get_output_filename(file.filename, 'docx')
         
         return create_file_response(output_file, output_filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", lambda: cleanup_files(temp_file, output_file))
     
+    except subprocess.CalledProcessError as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=f"LibreOffice conversion error: {e.stderr.decode()}")
+    except subprocess.TimeoutExpired:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail="LibreOffice conversion timeout")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
@@ -520,30 +529,35 @@ async def word_to_pdf(file: UploadFile = File(...)):
     
     try:
         temp_file = await save_upload_file(file)
-        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        temp_dir = temp_file.parent
+        output_stem = Path(temp_file).stem
         
-        # Read Word document
-        doc = Document(str(temp_file))
+        # Use LibreOffice headless to convert DOCX to PDF
+        subprocess.run([
+            'libreoffice',
+            '--headless',
+            '--norestore',
+            '--convert-to', 'pdf',
+            '--outdir', str(temp_dir),
+            str(temp_file)
+        ], check=True, capture_output=True, timeout=120)
         
-        # Create PDF
-        c = canvas.Canvas(str(output_file), pagesize=letter)
-        width, height = letter
-        y_position = height - 50
+        # LibreOffice creates output with same name as input
+        output_file = temp_dir / f"{output_stem}.pdf"
         
-        for paragraph in doc.paragraphs:
-            if paragraph.text.strip():
-                c.drawString(50, y_position, paragraph.text[:100])
-                y_position -= 20
-                if y_position < 50:
-                    c.showPage()
-                    y_position = height - 50
-        
-        c.save()
+        if not output_file.exists():
+            raise HTTPException(status_code=500, detail="LibreOffice conversion failed: output file not created")
         
         output_filename = get_output_filename(file.filename, 'pdf')
         
         return create_file_response(output_file, output_filename, "application/pdf", lambda: cleanup_files(temp_file, output_file))
     
+    except subprocess.CalledProcessError as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=f"LibreOffice conversion error: {e.stderr.decode()}")
+    except subprocess.TimeoutExpired:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail="LibreOffice conversion timeout")
     except Exception as e:
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
