@@ -727,11 +727,11 @@ export default function ToolPage() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
           </Button>
           <h1
-            className="text-lg sm:text-2xl md:text-3xl font-heading font-bold gradient-text truncate text-center"
+            className="text-lg sm:text-2xl md:text-3xl font-heading font-bold gradient-text text-center flex-1 min-w-0"
           >
             {config.title}
           </h1>
-          <div className="w-32" /> {/* Spacer for centering */}
+          <div className="w-16 sm:w-32" /> {/* Spacer for centering */}
         </div>
       </div>
 
