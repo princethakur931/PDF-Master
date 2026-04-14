@@ -237,6 +237,13 @@ const toolConfigs = {
     hasExtraInput: false,
     hasColorMode: true,
   },
+  "sql-to-pdf": {
+    title: "SQL to PDF",
+    acceptFiles: ".sql",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
+  },
   "html-to-pdf": {
     title: "HTML to PDF",
     acceptFiles: ".html,.htm",
