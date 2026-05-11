@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -111,11 +112,16 @@ def create_file_response(file_path: Path, filename: str, media_type: str, cleanu
     # Use simple ASCII-safe encoding to avoid browser issues
     encoded_filename = quote(filename)
     
+    # Wrap callback in BackgroundTask if provided
+    background_task = None
+    if cleanup_callback:
+        background_task = BackgroundTask(cleanup_callback)
+    
     response = FileResponse(
         path=str(file_path),
         media_type=media_type,
         filename=filename,
-        background=cleanup_callback
+        background=background_task
     )
     
     # Override Content-Disposition header with both formats for maximum compatibility
@@ -496,6 +502,7 @@ async def pdf_to_word(file: UploadFile = File(...)):
             'libreoffice',
             '--headless',
             '--norestore',
+            '--infilter=writer_pdf_import',
             '--convert-to', 'docx',
             '--outdir', str(temp_dir),
             str(temp_file)
@@ -509,7 +516,12 @@ async def pdf_to_word(file: UploadFile = File(...)):
         
         output_filename = get_output_filename(file.filename, 'docx')
         
-        return create_file_response(output_file, output_filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", lambda: cleanup_files(temp_file, output_file))
+        return create_file_response(
+            output_file, 
+            output_filename, 
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            lambda: cleanup_files(temp_file, output_file)
+        )
     
     except subprocess.CalledProcessError as e:
         cleanup_files(temp_file, output_file)
