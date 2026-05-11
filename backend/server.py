@@ -742,6 +742,29 @@ async def php_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw"))
         cleanup_files(temp_file, output_file)
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/sql-to-pdf")
+async def sql_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
+    """Convert SQL source code file to PDF"""
+    temp_file = None
+    output_file = None
+    try:
+        temp_file = await save_upload_file(file)
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            code = f.read()
+        output_file = UPLOAD_DIR / f"{uuid.uuid4()}.pdf"
+        build_code_pdf(code, output_file, color_mode)
+        output_filename = get_output_filename(file.filename, 'pdf')
+        return create_file_response(output_file, output_filename, "application/pdf",
+                                    lambda: cleanup_files(temp_file, output_file))
+    except HTTPException:
+        raise
+    except UnicodeDecodeError:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
+    except Exception as e:
+        cleanup_files(temp_file, output_file)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @api_router.post("/ts-to-pdf")
 async def ts_to_pdf(file: UploadFile = File(...), color_mode: str = Form("bw")):
     """Convert TypeScript source code file to PDF"""

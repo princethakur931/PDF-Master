@@ -142,6 +142,13 @@ const tools = [
     color: "from-indigo-600 to-purple-600",
   },
   {
+    id: "sql-to-pdf",
+    name: "SQL to PDF",
+    icon: FileCode,
+    description: "Convert SQL files to PDF",
+    color: "from-cyan-600 to-sky-600",
+  },
+  {
     id: "ts-to-pdf",
     name: "TypeScript to PDF",
     icon: FileCode,
@@ -301,6 +308,7 @@ export default function Home() {
       { id: "c-to-pdf", name: "C to PDF", icon: FileCode },
       { id: "js-to-pdf", name: "JavaScript to PDF", icon: FileCode },
       { id: "php-to-pdf", name: "PHP to PDF", icon: FileCode },
+      { id: "sql-to-pdf", name: "SQL to PDF", icon: FileCode },
       { id: "ts-to-pdf", name: "TypeScript to PDF", icon: FileCode },
       { id: "ipynb-to-pdf", name: "Notebook to PDF", icon: FileText },
       { id: "xml-to-pdf", name: "XML to PDF", icon: FileCode },

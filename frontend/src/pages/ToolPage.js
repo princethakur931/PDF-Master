@@ -237,6 +237,13 @@ const toolConfigs = {
     hasExtraInput: false,
     hasColorMode: true,
   },
+  "sql-to-pdf": {
+    title: "SQL to PDF",
+    acceptFiles: ".sql",
+    multiple: false,
+    hasExtraInput: false,
+    hasColorMode: true,
+  },
   "html-to-pdf": {
     title: "HTML to PDF",
     acceptFiles: ".html,.htm",
@@ -666,7 +673,7 @@ export default function ToolPage() {
             Tool not found
           </h1>
           <Button onClick={() => navigate("/")} data-testid="back-button">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
+            <ArrowLeft className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Back to Home</span><span className="sm:hidden">Back</span>
           </Button>
         </div>
       </div>
@@ -679,13 +686,14 @@ export default function ToolPage() {
         isDarkMode ? "bg-gray-950" : "bg-gray-50"
       }`}
     >
-      {/* Dark/Light Mode Toggle */}
+     
+      {/* Dark/Light Mode Toggle - hidden on mobile */}
       <motion.button
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.5 }}
         onClick={() => setIsDarkMode(!isDarkMode)}
-        className={`fixed top-6 right-6 z-50 p-3 rounded-full ${
+        className={`hidden sm:block fixed top-6 right-6 z-50 p-3 rounded-full ${
           isDarkMode
             ? "bg-white/10 hover:bg-white/20"
             : "bg-gray-800/10 hover:bg-gray-800/20"
@@ -718,7 +726,7 @@ export default function ToolPage() {
           isDarkMode ? "border-white/10" : "border-gray-200"
         }`}
       >
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <div className="max-w-5xl mx-auto flex items-center justify-between gap-2">
           <Button
             variant="ghost"
             onClick={() => navigate("/")}
@@ -732,17 +740,16 @@ export default function ToolPage() {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Home
           </Button>
           <h1
-            className="text-2xl md:text-3xl font-heading font-bold gradient-text"
-            data-testid="tool-title"
+            className="text-lg sm:text-2xl md:text-3xl font-heading font-bold gradient-text text-center flex-1 min-w-0"
           >
             {config.title}
           </h1>
-          <div className="w-32" /> {/* Spacer for centering */}
+          <div className="w-16 sm:w-32" /> {/* Spacer for centering */}
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="py-12 px-6">
+      <div className="py-6 sm:py-12 px-3 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Upload Section */}
@@ -752,7 +759,7 @@ export default function ToolPage() {
               transition={{ duration: 0.5 }}
             >
               <div
-                className={`rounded-2xl p-8 ${
+                className={`rounded-2xl p-4 sm:p-8 ${
                   isDarkMode
                     ? "glass"
                     : "bg-white shadow-xl border border-gray-200"
@@ -769,7 +776,7 @@ export default function ToolPage() {
                 {/* Dropzone */}
                 <div
                   {...getRootProps()}
-                  className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-300 min-h-[300px] flex flex-col items-center justify-center ${
+                  className={`border-2 border-dashed rounded-xl p-6 sm:p-12 text-center cursor-pointer transition-all duration-300 min-h-[220px] sm:min-h-[300px] flex flex-col items-center justify-center ${
                     isDragActive
                       ? "border-indigo-500 bg-indigo-500/10"
                       : isDarkMode
@@ -1488,7 +1495,7 @@ export default function ToolPage() {
                 <Button
                   onClick={handleProcess}
                   disabled={processing || files.length === 0}
-                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                  className="w-full mt-6 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-4 sm:py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                   data-testid="process-button"
                 >
                   {processing ? (
@@ -1510,7 +1517,7 @@ export default function ToolPage() {
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div
-                className={`rounded-2xl p-8 min-h-[500px] flex flex-col ${
+                className={`rounded-2xl p-4 sm:p-8 min-h-[500px] flex flex-col ${
                   isDarkMode
                     ? "glass"
                     : "bg-white shadow-xl border border-gray-200"
@@ -1593,7 +1600,7 @@ export default function ToolPage() {
                     <div className="space-y-3 w-full">
                       <Button
                         onClick={handleDownload}
-                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium py-6 rounded-full shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-medium py-4 sm:py-6 rounded-full shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:-translate-y-0.5 transition-all duration-300"
                         data-testid="download-button"
                       >
                         <Download className="mr-2 h-5 w-5" />
@@ -1603,7 +1610,7 @@ export default function ToolPage() {
                       {/* Native Share Button */}
                       <Button
                         onClick={handleShare}
-                        className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-6 rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                        className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium py-4 sm:py-6 rounded-full shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 transition-all duration-300"
                       >
                         <Share2 className="mr-2 h-5 w-5" />
                         Share File
@@ -1650,7 +1657,7 @@ export default function ToolPage() {
                     </p>
                     <Button
                       onClick={handleReset}
-                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
+                      className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium py-4 sm:py-6 rounded-full shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all duration-300"
                     >
                       Process Another File
                     </Button>
